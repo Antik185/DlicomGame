@@ -221,31 +221,33 @@ function materializeDeviceProfile(profile, username, existingId = "") {
 
 const MASCOT_IMAGES = Object.freeze({
   builders: [
-    "assets/images/Builders/Изображение ChatGPT 26 сент. 2026 г., 16_49_42.png",
-    "assets/images/Builders/Изображение ChatGPT 26 сент. 2026 г., 16_50_01.png",
-    "assets/images/Builders/Изображение ChatGPT 26 сент. 2026 г., 16_50_07.png",
-    "assets/images/Builders/Изображение ChatGPT 26 сент. 2026 г., 16_50_19.png",
-    "assets/images/Builders/Изображение ChatGPT 26 сент. 2026 г., 16_50_25.png",
-    "assets/images/Builders/Изображение ChatGPT 26 сент. 2026 г., 16_50_34.png",
-    "assets/images/Builders/Изображение ChatGPT 26 сент. 2026 г., 16_50_46.png",
-    "assets/images/Builders/Изображение ChatGPT 26 сент. 2026 г., 16_50_57.png"
+    "assets/images/Builders/builder-01.png",
+    "assets/images/Builders/builder-02.png",
+    "assets/images/Builders/builder-03.png",
+    "assets/images/Builders/builder-04.png",
+    "assets/images/Builders/builder-05.png",
+    "assets/images/Builders/builder-06.png",
+    "assets/images/Builders/builder-07.png",
+    "assets/images/Builders/builder-08.png"
   ],
   content: [
-    "assets/images/Content/Изображение ChatGPT 26 сент. 2026 г., 16_54_29-1.png",
-    "assets/images/Content/Изображение ChatGPT 26 сент. 2026 г., 16_54_30-2.png",
-    "assets/images/Content/Изображение ChatGPT 26 сент. 2026 г., 16_54_31-3.png",
-    "assets/images/Content/Изображение ChatGPT 26 сент. 2026 г., 16_54_32-4.png",
-    "assets/images/Content/Изображение ChatGPT 26 сент. 2026 г., 16_54_33-5.png"
+    "assets/images/Content/content-01.png",
+    "assets/images/Content/content-02.png",
+    "assets/images/Content/content-03.png",
+    "assets/images/Content/content-04.png",
+    "assets/images/Content/content-05.png"
   ],
   regular: [
-    "assets/images/Regular/Изображение ChatGPT 26 сент. 2026 г., 16_57_36-1.png",
-    "assets/images/Regular/Изображение ChatGPT 26 сент. 2026 г., 16_57_37-2.png",
-    "assets/images/Regular/Изображение ChatGPT 26 сент. 2026 г., 16_57_38-3.png",
-    "assets/images/Regular/Изображение ChatGPT 26 сент. 2026 г., 16_57_40-4.png",
-    "assets/images/Regular/Изображение ChatGPT 26 сент. 2026 г., 16_57_41-5.png"
+    "assets/images/Regular/regular-01.png",
+    "assets/images/Regular/regular-02.png",
+    "assets/images/Regular/regular-03.png",
+    "assets/images/Regular/regular-04.png",
+    "assets/images/Regular/regular-05.png"
   ],
   fakeBuilder: "assets/images/Builders/fake.png"
 });
+
+const DEFAULT_MASCOT_IMAGE = MASCOT_IMAGES.regular[0];
 
 function mascotImageFor(template, index) {
   if (template.username === "@coolbuilder") return MASCOT_IMAGES.fakeBuilder;
@@ -582,6 +584,7 @@ function openMobilePanel(panelName) {
   const panel = mobilePanels[panelName];
   closeMobilePanels(false);
   if (!panel || !isMobileLandscapeLayout()) return;
+  if (!els.toolTray.hidden) setApp("discord");
   document.body.classList.add(panel.className);
   panel.button?.setAttribute("aria-expanded", "true");
   if (els.mobileScrim) els.mobileScrim.hidden = false;
@@ -1569,7 +1572,7 @@ function cardHtml(v, animatedField = "") {
     <div class="applicant-photo"><img src="${escapeHtml(v.avatar || "assets/dlicom-builder.png")}" alt="${escapeHtml(v.name)}"></div>
     <div class="applicant-section applicant-main">
       <div class="card-data-field"><span>Display name</span><strong>${escapeHtml(v.name)}</strong></div>
-      <div class="card-data-field"><span>Username</span><strong>${escapeHtml(v.username)}</strong></div>
+      <div class="card-data-field"><span>Username</span><strong class="card-username-copy" data-copy-username="${escapeHtml(v.username)}" role="button" tabindex="0" aria-label="Copy Discord username ${escapeHtml(v.username)}">${escapeHtml(v.username)}</strong></div>
       <div class="card-data-field role-field"><span>Requested role</span><strong class="role-value">${roleValueHtml(v.role)}</strong></div>
       <div class="card-data-field"><span>Account created</span><strong>${escapeHtml(v.created)}</strong></div>
     </div>
@@ -2146,9 +2149,9 @@ function preloadVisitorImage(source) {
 
 async function beginVisitorArrival(v) {
   const marker = state.index;
-  const requestedSource = encodeURI(v.mascotImage || "assets/dlicom-builder.png");
+  const requestedSource = v.mascotImage || DEFAULT_MASCOT_IMAGE;
   let loadedImage = await preloadVisitorImage(requestedSource);
-  if (!loadedImage) loadedImage = await preloadVisitorImage("assets/dlicom-builder.png");
+  if (!loadedImage && requestedSource !== DEFAULT_MASCOT_IMAGE) loadedImage = await preloadVisitorImage(DEFAULT_MASCOT_IMAGE);
   if (!loadedImage || state.index !== marker || state.ended) return;
 
   els.image.src = loadedImage.src;
@@ -2249,6 +2252,20 @@ function showToast(message, tone) {
   els.toast.style.color = tone === "reject" ? "var(--coral)" : tone === "admin" ? "var(--yellow)" : "var(--cyan)";
   els.toast.classList.add("show");
   setTimeout(() => els.toast.classList.remove("show"), 1250);
+}
+
+async function copyApplicantUsername(target) {
+  if (!isMobileLandscapeLayout()) return;
+  const username = target?.dataset.copyUsername;
+  if (!username) return;
+  const value = username.replace(/^@/, "");
+  try {
+    await navigator.clipboard.writeText(value);
+    showToast(`@${value} COPIED`, "accept");
+    beep("click");
+  } catch (_) {
+    showToast("COPY FAILED // TRY AGAIN", "reject");
+  }
 }
 
 function scamMessageFor(v) {
@@ -2773,11 +2790,22 @@ els.toolClose.addEventListener("click", () => setApp("discord"));
 els.databaseForm.addEventListener("submit", event => { event.preventDefault(); try { searchDatabase(els.databaseInput.value); beep("click"); } catch (error) { els.databaseResults.innerHTML = emptyTool("!", "ENTER A USERNAME", error.message); } });
 els.xForm.addEventListener("submit", event => { event.preventDefault(); try { searchX(els.xInput.value); beep("click"); } catch (error) { els.xResults.innerHTML = emptyTool("!", "ENTER A HANDLE", error.message); } });
 els.toolOutput.addEventListener("click", event => {
+  const copyUsername = event.target.closest("[data-copy-username]");
+  if (copyUsername) {
+    copyApplicantUsername(copyUsername);
+    return;
+  }
   const field = event.target.closest("[data-connect-key]");
   if (!field) return;
   if (!state.selectedEvidence) selectEvidence(field);
   else if (state.selectedEvidence.element === field) clearEvidenceSelection();
   else resolveEvidenceConnection(field, field.dataset.connectKey);
+});
+els.toolOutput.addEventListener("keydown", event => {
+  const copyUsername = event.target.closest("[data-copy-username]");
+  if (!copyUsername || !["Enter", " "].includes(event.key)) return;
+  event.preventDefault();
+  copyApplicantUsername(copyUsername);
 });
 els.databaseResults.addEventListener("click", event => {
   const currentDeviceAccount = event.target.closest("[data-device-current]");
