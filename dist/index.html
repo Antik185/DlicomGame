@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080916">
+  <meta name="description" content="DLICOM: Night Shift — a cozy community moderation game.">
+  <title>DLICOM: Night Shift</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080916'/%3E%3Cpath d='M17 14h16c12 0 19 7 19 18s-7 18-19 18H17V14Zm12 10v16h4c6 0 9-3 9-8s-3-8-9-8h-4Z' fill='%237a74e8'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css?v=47">
+</head>
+<body>
+  <div class="room-glow" aria-hidden="true"></div>
+  <div class="noise" aria-hidden="true"></div>
+  <section class="rotate-gate" aria-labelledby="rotateGateTitle">
+    <div>
+      <span>DLICOM COMMUNITY · MOBILE TERMINAL</span>
+      <strong aria-hidden="true">↻</strong>
+      <h1 id="rotateGateTitle">Rotate to continue</h1>
+      <p>Turn your phone or tablet sideways to start the shift.</p>
+      <small>Landscape mode keeps the mascot and controls visible.</small>
+    </div>
+  </section>
+
+  <nav class="mobile-toolbar" aria-label="Mobile panels">
+    <button id="mobileChatToggle" type="button" aria-label="Chat panel" aria-controls="chatPanel" aria-expanded="false"><span aria-hidden="true">#</span><b>CHAT</b></button>
+    <button id="mobileRulesToggle" type="button" aria-label="Shift rules" aria-controls="rulesPanel" aria-expanded="false"><span aria-hidden="true">✓</span><b>RULES</b></button>
+    <button id="mobileDecisionToggle" type="button" aria-label="Access decision" aria-controls="decisionPanel" aria-expanded="false"><span aria-hidden="true">↳</span><b>DECIDE</b></button>
+  </nav>
+  <button class="mobile-scrim" id="mobileScrim" type="button" aria-label="Close mobile panel" hidden></button>
+  <button class="mobile-evidence-chip" id="mobileEvidenceChip" type="button" aria-label="Return to selected evidence" hidden>
+    <span>EVIDENCE SELECTED</span>
+    <b id="mobileEvidenceName">ACCOUNT RECORD</b>
+    <small id="mobileEvidenceHint">TAP MASCOT TO CONNECT</small>
+  </button>
+
+  <main class="game-shell" id="gameShell">
+    <section class="game-board">
+      <aside class="chat-panel" id="chatPanel" aria-label="Dlicom Discord chat">
+        <header class="discord-head">
+          <div class="server-title-row">
+            <span class="discord-logo">D</span>
+            <strong>DLICOM</strong>
+          </div>
+          <div class="server-overview">
+            <div class="community-health" aria-label="Community status">
+              <span class="health-stat safety"><i>Safety</i><b id="safetyValue">80</b></span>
+              <span class="health-stat trust"><i>Trust</i><b id="trustValue">75</b></span>
+              <span class="health-stat activity"><i>Activity</i><b id="activityValue">65</b></span>
+            </div>
+            <small class="community-roster" aria-label="Community composition">
+              <span><i>Builders</i><b id="buildersCount">4</b></span>
+              <span><i>Artists</i><b id="artistsCount">2</b></span>
+              <span><i>Clipmakers</i><b id="clipmakersCount">3</b></span>
+              <span><i>Supporters</i><b id="supportersCount">2</b></span>
+              <span class="members-stat"><i>Members</i><b id="membersCount">148</b></span>
+            </small>
+          </div>
+        </header>
+
+        <nav class="channel-switch" aria-label="Discord channels">
+          <button class="channel-button active" data-channel="general" type="button"><span>#</span> general <b id="generalUnread" hidden>0</b></button>
+          <button class="channel-button" data-channel="admins" type="button"><span>#</span> admins <b id="adminsUnread" hidden>0</b></button>
+        </nav>
+
+        <header class="channel-header">
+          <strong><span>#</span> <i id="channelName">general</i></strong>
+          <small id="channelTopic">Community lobby · live</small>
+          <button class="chat-sound-button" id="chatSoundButton" type="button" aria-pressed="true" aria-label="Toggle chat notification sounds"><span aria-hidden="true">◖))</span><b id="chatSoundLabel">CHAT ON</b></button>
+        </header>
+        <div class="channel-feed" id="channelFeed" aria-live="polite"></div>
+        <div class="discord-compose"><span>+</span><p id="composePlaceholder">Message #general</p><b>☺</b></div>
+      </aside>
+
+      <section class="inspection-stack">
+        <section class="window-panel" aria-label="Visitor inspection window">
+          <header class="window-topline">
+            <div class="brand-lockup"><span>D</span><strong>LOBBY ACCESS<small>DLICOM COMMUNITY</small></strong></div>
+            <div class="camera-state"><i></i><span id="caseId">CASE // 001</span></div>
+          </header>
+
+          <div class="stage" id="stage">
+            <div class="booth-wall" aria-hidden="true"><i></i><i></i><i></i></div>
+            <div class="lamp lamp-left" aria-hidden="true"></div>
+            <div class="lamp lamp-right" aria-hidden="true"></div>
+            <div class="counter-line" aria-hidden="true"></div>
+            <div class="visitor-halo" aria-hidden="true"></div>
+
+            <button class="visitor" id="visitorButton" type="button" aria-label="Talk to visitor" hidden>
+              <span class="visitor-shadow" aria-hidden="true"></span>
+              <span class="visitor-sprite">
+                <img id="visitorImage" src="assets/dlicom-builder.png" alt="A Dlicom visitor waiting at the window">
+              </span>
+              <span class="talk-hint">CLICK TO QUESTION</span>
+            </button>
+            <img class="desk-foreground" src="assets/table.png" alt="" aria-hidden="true">
+
+            <div class="speech-card" id="speechCard" hidden>
+              <span class="speaker" id="speakerName">PIXELPAWS</span>
+              <p id="visitorIntro">Hey! I'm participating in the Game Jam.</p>
+            </div>
+
+            <div class="question-wheel" id="questionDrawer" hidden>
+              <div class="wheel-orbit" id="questionOptions"></div>
+              <div class="wheel-pointer" id="wheelPointer" aria-hidden="true"><i></i></div>
+              <button class="wheel-close" id="closeQuestions" type="button" aria-label="Close questions"><span>ASK</span><small>× CLOSE</small></button>
+            </div>
+
+            <div class="conversation" id="conversation" hidden aria-live="polite">
+              <div class="dialogue-line visitor-reply"><span id="answerSpeaker">PIXELPAWS</span><p id="questionAnswer"></p></div>
+              <div class="dialogue-line player-question"><span>YOU</span><p id="playerQuestion"></p></div>
+            </div>
+
+            <button class="admin-review-button" id="adminReviewButton" type="button" hidden>
+              <span>QUESTION THE BAN?</span>
+              <b>ASK #ADMINS</b>
+            </button>
+          </div>
+          <footer class="window-rail"><span>GLASS // REINFORCED</span><i></i><span>MIC // OPEN</span></footer>
+        </section>
+
+        <section class="applicant-zone" aria-label="Applicant card and verification tools">
+          <div class="tool-output" id="toolOutput"></div>
+          <nav class="verification-bar" aria-label="Verification tools">
+            <button class="verify-button" data-app="database" data-tool="search" type="button"><img src="assets/icons/Lupa.svg" alt=""><b>Search<small>on server</small></b></button>
+            <button class="verify-button" data-app="database" data-tool="device" type="button"><img src="assets/icons/device.svg" alt=""><b>Device<small>check</small></b></button>
+            <button class="verify-button" data-app="database" data-tool="account" type="button"><img src="assets/icons/AccounnDetails.svg" alt=""><b>Account<small>details</small></b></button>
+            <button class="verify-button" data-app="database" data-tool="phone" type="button"><img src="assets/icons/phone.svg" alt=""><b>Phone<small>lookup</small></b></button>
+            <button class="verify-button" data-app="x" data-tool="x" type="button"><img src="assets/icons/X.svg" alt=""><b>X profile<small>recent posts</small></b></button>
+          </nav>
+
+          <section class="tool-tray" id="toolTray" hidden aria-label="Verification terminal">
+            <header class="tool-tray-head"><div><span>MOD TERMINAL</span><strong id="toolTitle">SERVER SEARCH</strong></div><button id="toolClose" type="button" aria-label="Close verification terminal">×</button></header>
+
+            <div class="tool-screen" id="databaseApp" data-tool-screen="database">
+              <form class="terminal-search" id="databaseForm">
+                <label for="databaseInput">ENTER USERNAME YOURSELF</label>
+                <div><span>@</span><input id="databaseInput" type="text" autocomplete="off" spellcheck="false" placeholder="type username" maxlength="32"><button type="submit">SEARCH</button></div>
+              </form>
+              <div class="search-output" id="databaseResults" aria-live="polite">
+                <div class="empty-tool"><span>⌕</span><strong>NO QUERY</strong><p>Use the name on the applicant card, or search any claimed inviter.</p></div>
+              </div>
+            </div>
+
+            <div class="tool-screen" id="xApp" data-tool-screen="x" hidden>
+              <form class="terminal-search" id="xForm">
+                <label for="xInput">ENTER X HANDLE YOURSELF</label>
+                <div><span>@</span><input id="xInput" type="text" autocomplete="off" spellcheck="false" placeholder="type handle" maxlength="32"><button type="submit">OPEN</button></div>
+              </form>
+              <div class="search-output" id="xResults" aria-live="polite">
+                <div class="empty-tool"><span>𝕏</span><strong>PROFILE LOOKUP</strong><p>Enter the handle shown on the applicant card.</p></div>
+              </div>
+            </div>
+          </section>
+        </section>
+      </section>
+
+      <aside class="right-rail">
+        <section class="clock-panel" aria-label="Shift status">
+          <div><strong id="shiftClock">02:17 AM</strong><span>SEP 24, 2026</span></div>
+          <div class="shift-count"><span>SHIFT</span><b id="progressLabel">00 / 14</b></div>
+          <div class="meter-track"><i id="progressBar"></i></div>
+          <button class="sound-button" id="soundButton" type="button" aria-pressed="true" aria-label="Toggle interface sounds"><span class="sound-bars" aria-hidden="true"><i></i><i></i><i></i></span><span id="soundLabel">SOUND ON</span></button>
+          <label class="master-volume" for="volumeSlider"><span>VOL</span><input id="volumeSlider" type="range" min="0" max="100" value="85" step="1" aria-label="Game sound volume"><output id="volumeValue" for="volumeSlider">85%</output></label>
+        </section>
+
+        <section class="rules-paper" id="rulesPanel" aria-label="Shift rules">
+          <header><strong>SHIFT RULES</strong><span id="rulesMemo">MEMO 1/4</span></header>
+          <div id="shiftRulesList">
+            <p class="rule-connect-target" data-connect-target="rule-account-age"><i>✓</i><span>Account must be at least 14 days old.</span></p>
+            <p><i>✓</i><span>Phone verification is required.</span></p>
+            <p><i>✓</i><span>Old bans still count.</span></p>
+          </div>
+          <p class="memo-note"><i>!</i><span>Check <b>#admins</b> for rule changes during the shift.</span></p>
+        </section>
+
+        <section class="decision-dock" id="decisionPanel" aria-label="Access decision">
+          <div class="decision-label"><span>DECISION</span><i id="checksCount">CHECK THE RECORDS</i></div>
+          <div class="decision-actions">
+            <button class="decision accept" id="acceptButton" type="button"><span class="decision-icon">↳</span><span><b>LET IN</b><small>GRANT ACCESS</small></span></button>
+            <button class="decision reject" id="rejectButton" type="button"><span class="decision-icon">⊘</span><span><b>REJECT</b><small>DENY ENTRY</small></span></button>
+          </div>
+          <p class="shortcut-copy"><kbd>A</kbd> LET IN <kbd>R</kbd> REJECT</p>
+        </section>
+      </aside>
+    </section>
+  </main>
+
+  <section class="reject-overlay" id="rejectOverlay" hidden aria-labelledby="rejectTitle">
+    <div class="reject-panel" role="dialog" aria-modal="true">
+      <header>
+        <div><span>DENY ACCESS</span><h2 id="rejectTitle">Choose a reason</h2></div>
+        <button id="rejectClose" type="button" aria-label="Close rejection reasons">×</button>
+      </header>
+      <p>Only evidence you discovered during this inspection is available.</p>
+      <div class="reject-reasons" id="rejectReasons"></div>
+    </div>
+  </section>
+
+  <section class="start-overlay" id="startOverlay" role="dialog" aria-modal="true" aria-labelledby="startTitle">
+    <div class="start-card">
+      <span class="eyebrow">DLICOM COMMUNITY · ACCESS CONTROL</span>
+      <h2 id="startTitle">NIGHT<br><em>SHIFT</em></h2>
+      <p>Read the staff channel, inspect each applicant, and make the call before sunrise.</p>
+      <div class="briefing-grid">
+        <div><span>SHIFT</span><strong>02:00 — 06:00</strong></div>
+        <div><span>QUEUE</span><strong>14 VISITORS</strong></div>
+        <div><span>FIRST STEP</span><strong>READ #ADMINS</strong></div>
+      </div>
+      <section class="pool-selector" aria-labelledby="poolTitle">
+        <div class="pool-selector-head">
+          <div><span>APPLICANT POOL</span><strong id="poolTitle">Choose a region</strong></div>
+          <small id="poolStatus">Loading real member roster…</small>
+        </div>
+        <div class="region-picker" id="regionPicker" role="group" aria-label="Applicant region">
+          <button class="region-choice active" type="button" data-region="ALL"><strong>All server</strong><span>…</span></button>
+        </div>
+      </section>
+      <div class="start-actions">
+        <button id="startButton" type="button"><span>PLAY</span><b>→</b></button>
+        <button class="training-start" id="trainingButton" type="button"><span>TRAINING</span><b>◇</b></button>
+      </div>
+      <small>Headphones optional · keyboard friendly</small>
+    </div>
+  </section>
+
+  <section class="training-layer" id="trainingLayer" hidden aria-live="polite">
+    <div class="training-spotlight" id="trainingSpotlight" aria-hidden="true"></div>
+    <aside class="training-admin" id="trainingAdminBox">
+      <header><img src="assets/avatars/retree___959497033172008970.png" alt=""><span><b>RETREE</b><small>TRAINING ADMIN</small></span></header>
+      <div id="trainingAdminMessage"></div>
+      <button class="training-next" id="trainingNextButton" type="button" hidden disabled><span>READING…</span><b>→</b></button>
+    </aside>
+    <button class="training-skip" id="trainingSkipButton" type="button">SKIP TRAINING</button>
+  </section>
+
+  <section class="training-confirm" id="trainingSkipConfirm" hidden aria-labelledby="trainingSkipTitle">
+    <div role="dialog" aria-modal="true">
+      <span>TRAINING SESSION</span>
+      <h2 id="trainingSkipTitle">Skip training?</h2>
+      <p>Your tutorial progress will be cleared.</p>
+      <div><button id="trainingSkipCancel" type="button">CANCEL</button><button id="trainingSkipAccept" type="button">SKIP</button></div>
+    </div>
+  </section>
+
+  <section class="training-complete" id="trainingComplete" hidden aria-labelledby="trainingCompleteTitle">
+    <div class="training-complete-card" role="dialog" aria-modal="true">
+      <span class="eyebrow">TUTORIAL SHIFT · COMPLETE</span>
+      <h2 id="trainingCompleteTitle">TRAINING COMPLETE</h2>
+      <p>You know how to:</p>
+      <div class="training-checklist">
+        <span>✓ Check accounts</span><span>✓ Verify phones</span>
+        <span>✓ Search for impersonators</span><span>✓ Inspect X profiles</span>
+        <span>✓ Investigate previous bans</span><span>✓ Check linked devices</span>
+        <span>✓ Follow changing rules</span><span>✓ Protect community health</span>
+        <span>✓ Monitor General chat</span><span>✓ Send cases to Admin</span>
+      </div>
+      <strong>Return to the menu when you are ready for the real shift.</strong>
+      <button id="trainingPlayButton" type="button">RETURN TO MAIN MENU <span>→</span></button>
+    </div>
+  </section>
+
+  <section class="end-overlay" id="endOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="endTitle">
+    <div class="end-card">
+      <span class="eyebrow" id="endEyebrow">06:00 · SHIFT COMPLETE</span>
+      <h2 id="endTitle">SHIFT COMPLETE</h2>
+      <div class="final-score"><span>MODERATOR SCORE</span><strong id="finalScore">0</strong></div>
+      <p id="endMessage">The server made it through the night.</p>
+      <div class="final-community" aria-label="Final community status">
+        <div><span>SAFETY</span><strong id="endSafety">80</strong></div>
+        <div><span>TRUST</span><strong id="endTrust">75</strong></div>
+        <div><span>ACTIVITY</span><strong id="endActivity">65</strong></div>
+      </div>
+      <div class="final-roster">
+        <span>Builders <b id="endBuilders">4</b></span>
+        <span>Artists <b id="endArtists">2</b></span>
+        <span>Clipmakers <b id="endClipmakers">3</b></span>
+        <span>Supporters <b id="endSupporters">2</b></span>
+        <span>Members <b id="endMembers">148</b></span>
+      </div>
+      <div class="report-stats">
+        <div><span>CORRECT CALLS</span><strong id="correctStat">0 / 14</strong></div>
+        <div><span>MISTAKES</span><strong id="mistakesStat">0</strong></div>
+        <div><span>SCAMMERS STOPPED</span><strong id="stoppedStat">0</strong></div>
+        <div><span>IMPOSTORS CAUGHT</span><strong id="impostorsStat">0</strong></div>
+        <div><span>FALSE REJECTS</span><strong id="falseRejectsStat">0</strong></div>
+        <div><span>INCIDENTS RESOLVED</span><strong id="resolvedStat">0</strong></div>
+      </div>
+      <button id="restartButton" type="button">RUN ANOTHER SHIFT</button>
+    </div>
+  </section>
+
+  <div class="toast" id="toast" role="status" aria-live="polite">DECISION LOGGED</div>
+  <script src="game.js?v=47"></script>
+</body>
+</html>

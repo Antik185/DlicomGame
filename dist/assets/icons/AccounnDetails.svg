@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="#5ce1e6" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Верхние петли-крепления -->
+  <line x1="7.5" y1="2" x2="7.5" y2="5" stroke-width="2" />
+  <line x1="16.5" y1="2" x2="16.5" y2="5" stroke-width="2" />
+
+  <!-- Корпус календаря со скругленными углами -->
+  <rect x="3.5" y="4" width="17" height="17" rx="3.5" stroke-width="2" />
+
+  <!-- Горизонтальная линия шапки -->
+  <line x1="4" y1="9" x2="20" y2="9" stroke-width="2" />
+
+  <!-- Внутренние линии расписания / дней -->
+  <line x1="7.5" y1="13" x2="16.5" y2="13" stroke-width="1.8" />
+  <line x1="7.5" y1="16.5" x2="13.5" y2="16.5" stroke-width="1.8" />
+</svg>

@@ -1,0 +1,7 @@
+# Raw Discord exports stay local. The game ships only the minimized roster.
+dist/assets/regChats/*
+!dist/assets/regChats/participants.json
+
+# Private/raw source exports and editor project files are not deployment assets.
+source-data/general-chat-export.json
+dist/assets/images/Regular/*.stencyl
