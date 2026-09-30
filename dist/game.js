@@ -518,6 +518,7 @@ let generalChatMessages = [];
 let chatLoadPromise = null;
 let regionalParticipants = [];
 let regionalRosterPromise = null;
+let regionalCounts = {};
 let selectedRegion = "ALL";
 const state = {
   index: 0, decisions: [], started: false, locked: false, mode: "normal", sound: true, chatSound: true, masterVolume: .85, chatIndex: 0,
@@ -553,6 +554,7 @@ const els = {
   safety: $("safetyValue"), trust: $("trustValue"), activity: $("activityValue"),
   builders: $("buildersCount"), artists: $("artistsCount"), clipmakers: $("clipmakersCount"), supporters: $("supportersCount"), members: $("membersCount"),
   regionPicker: $("regionPicker"), poolStatus: $("poolStatus"), startButton: $("startButton"),
+  languagePicker: $("languagePicker"),
   rejectOverlay: $("rejectOverlay"), rejectReasons: $("rejectReasons"), rejectClose: $("rejectClose"),
   soundButton: $("soundButton"), soundLabel: $("soundLabel"), chatSoundButton: $("chatSoundButton"), chatSoundLabel: $("chatSoundLabel"),
   volumeSlider: $("volumeSlider"), volumeValue: $("volumeValue"), shiftRulesList: $("shiftRulesList"), rulesMemo: $("rulesMemo"),
@@ -562,6 +564,10 @@ const els = {
   mobileChatToggle: $("mobileChatToggle"), mobileRulesToggle: $("mobileRulesToggle"), mobileDecisionToggle: $("mobileDecisionToggle"), mobileScrim: $("mobileScrim"),
   mobileEvidenceChip: $("mobileEvidenceChip"), mobileEvidenceName: $("mobileEvidenceName"), mobileEvidenceHint: $("mobileEvidenceHint")
 };
+
+const tr = (key, variables = {}) => window.DLICOM_I18N?.t(key, variables) ?? key;
+const trPhrase = value => window.DLICOM_I18N?.phrase(value) ?? String(value);
+const localeCode = () => window.DLICOM_I18N?.locale || "en";
 
 const mobilePanels = {
   chat: { className:"mobile-chat-open", button:els.mobileChatToggle },
@@ -614,9 +620,9 @@ function prepareMobileEvidenceMode(element) {
   selected.anchor = selected.wasToolOpen && selected.toolAnchor?.isConnected
     ? selected.toolAnchor
     : selected.element;
-  const rawLabel = element.querySelector("span")?.textContent || selected.key || "ACCOUNT RECORD";
+  const rawLabel = element.querySelector("span")?.textContent || selected.key || tr("accountRecord");
   els.mobileEvidenceName.textContent = rawLabel.trim().replace(/\s+/g," ").toUpperCase();
-  els.mobileEvidenceHint.textContent = selected.key === "account-age" ? "TAP THE MATCHING RULE" : "TAP MASCOT TO CONNECT";
+  els.mobileEvidenceHint.textContent = selected.key === "account-age" ? tr("tapRule") : tr("tapMascot");
   els.mobileEvidenceChip.hidden = false;
   els.toolTray.hidden = true;
   document.body.classList.add("mobile-evidence-mode");
@@ -655,8 +661,8 @@ function prefillInput(input, value) {
   input.value = value;
   if (value) input.setAttribute("value", value);
   else input.removeAttribute("value");
-  if (input === els.databaseInput) input.placeholder = value || "type username";
-  if (input === els.xInput) input.placeholder = value || "type handle";
+  if (input === els.databaseInput) input.placeholder = value || tr("typeUsername");
+  if (input === els.xInput) input.placeholder = value || tr("typeHandle");
 }
 function scenarioKey(visitor) { return visitor.templateKey || visitor.username; }
 function isXHidden(visitor) { return hiddenXHandles.has(scenarioKey(visitor)); }
@@ -675,13 +681,13 @@ function phoneLimitExceeded(visitor) {
 function renderShiftRules() {
   if (!els.shiftRulesList) return;
   const rules = [
-    { key: "rule-account-age", text: `Account must be at least ${state.shiftRules.minAccountAgeDays} days old.` },
-    { text: state.shiftRules.phoneVerificationRequired ? "Phone verification is required." : "Phone verification is optional." },
-    { text: state.shiftRules.oldBansCount ? "Old bans still count." : "Old bans are advisory only." }
+    { key: "rule-account-age", text: tr("ruleAge", { days: state.shiftRules.minAccountAgeDays }) },
+    { text: state.shiftRules.phoneVerificationRequired ? tr("rulePhone") : trPhrase("Phone verification is optional.") },
+    { text: state.shiftRules.oldBansCount ? tr("ruleBans") : trPhrase("Old bans are advisory only.") }
   ];
-  if (state.shiftRules.maxAccountsPerPhone != null) rules.push({ text: `Maximum ${state.shiftRules.maxAccountsPerPhone} accounts per phone. Builders may use up to ${state.shiftRules.builderMaxAccountsPerPhone}.` });
+  if (state.shiftRules.maxAccountsPerPhone != null) rules.push({ text: `${tr("rulePhoneLimit", { count: state.shiftRules.maxAccountsPerPhone })} ${tr("ruleBuilderPhoneLimit", { count: state.shiftRules.builderMaxAccountsPerPhone })}` });
   els.shiftRulesList.innerHTML = rules.map(rule => `<p${rule.key ? ` class="rule-connect-target" data-connect-target="${rule.key}"` : ""}><i>✓</i><span>${escapeHtml(rule.text)}</span></p>`).join("");
-  if (els.rulesMemo) els.rulesMemo.textContent = state.shiftRules.maxAccountsPerPhone == null ? "MEMO 1/4" : "MEMO 2/4";
+  if (els.rulesMemo) els.rulesMemo.textContent = tr("memo", { current: state.shiftRules.maxAccountsPerPhone == null ? 1 : 2, total: 4 });
 }
 
 function shuffled(items) {
@@ -706,12 +712,13 @@ function loadRegionalRoster() {
       })
       .then(data => {
         regionalParticipants = Array.isArray(data.participants) ? data.participants : [];
-        renderRegionPicker(Array.isArray(data.regions) ? data.regions : [], data.counts || {});
+        regionalCounts = data.counts || {};
+        renderRegionPicker(Array.isArray(data.regions) ? data.regions : [], regionalCounts);
         return regionalParticipants;
       })
       .catch(() => {
         regionalParticipants = [];
-        if (els.poolStatus) els.poolStatus.textContent = "Regional roster unavailable · General archive will be used";
+        if (els.poolStatus) els.poolStatus.textContent = tr("rosterUnavailable");
         return regionalParticipants;
       });
   }
@@ -720,10 +727,12 @@ function loadRegionalRoster() {
 
 function renderRegionPicker(regions, counts) {
   if (!els.regionPicker) return;
+  regionalCounts = counts || regionalCounts;
+  const labelKeys = { ARABIC:"regionArabic", BANGLADESH:"regionBangladesh", CHINA:"regionChina", INDIA:"regionIndia", INDONESIA:"regionIndonesia", NIGERIA:"regionNigeria", RUSSIA:"regionRussia", UKRAINE:"regionUkraine", VIETNAM:"regionVietnam" };
   const choices = ["ALL", ...regions];
   els.regionPicker.innerHTML = choices.map(region => {
     const count = region === "ALL" ? regionalParticipants.length : Number(counts[region] || 0);
-    const label = region === "ALL" ? "All server" : region[0] + region.slice(1).toLowerCase();
+    const label = region === "ALL" ? tr("allServer") : tr(labelKeys[region] || region);
     return `<button class="region-choice ${region === selectedRegion ? "active" : ""}" type="button" data-region="${escapeHtml(region)}"><strong>${escapeHtml(label)}</strong><span>${count}</span></button>`;
   }).join("");
   updatePoolStatus(counts);
@@ -732,11 +741,12 @@ function renderRegionPicker(regions, counts) {
 function updatePoolStatus(counts = {}) {
   if (!els.poolStatus) return;
   if (selectedRegion === "ALL") {
-    els.poolStatus.textContent = `${regionalParticipants.length || "—"} real members · random all-server queue`;
+    els.poolStatus.textContent = tr("realMembers", { count: regionalParticipants.length || "—" });
     return;
   }
-  const count = Number(counts[selectedRegion] || regionalParticipants.filter(person => person.regions?.includes(selectedRegion)).length);
-  els.poolStatus.textContent = `${count} regional members · All server fills the queue if needed`;
+  const activeCounts = Object.keys(counts).length ? counts : regionalCounts;
+  const count = Number(activeCounts[selectedRegion] || regionalParticipants.filter(person => person.regions?.includes(selectedRegion)).length);
+  els.poolStatus.textContent = tr("regionalMembers", { count });
 }
 
 function fallbackRosterFromGeneral() {
@@ -1044,7 +1054,7 @@ function trainingElements(step = currentTrainingStep()) {
 }
 
 function renderTrainingMessage(lines) {
-  const copy = Array.isArray(lines) ? lines : [lines];
+  const copy = (Array.isArray(lines) ? lines : [lines]).map(trPhrase);
   els.trainingMessage.innerHTML = copy.filter(Boolean).slice(0,2).map(line => `<p>${escapeHtml(line)}</p>`).join("");
   playTutorialBlips(copy.join(" "));
 }
@@ -1054,7 +1064,7 @@ function runTrainingStepEffect(step) {
     setApp("discord");
     setChannel("admins");
     if (!state.messages.admins.some(entry => entry.trainingFocus === "rule")) {
-      addMessage("admins","retree","RULE UPDATE — Builders now need recent public proof of work. Always follow the latest message in #admins.",{
+      addMessage("admins","retree",trPhrase("RULE UPDATE — Builders now need recent public proof of work. Always follow the latest message in #admins."),{
         avatar:ADMIN_AVATAR,
         accent:"#ffb26b",
         trainingFocus:"rule"
@@ -1175,7 +1185,7 @@ function enterTrainingStep(id) {
   els.trainingNext.hidden = !step.after;
   els.trainingNext.disabled = true;
   els.trainingNext.classList.remove("ready");
-  els.trainingNext.querySelector("span").textContent = "READING…";
+  els.trainingNext.querySelector("span").textContent = tr("reading");
   syncMobileTrainingPanel(step);
   state.training.positionFrame = requestAnimationFrame(() => positionTrainingGuidance());
 
@@ -1191,7 +1201,7 @@ function enterTrainingStep(id) {
       if (state.training.stepId !== step.id) return;
       els.trainingNext.disabled = false;
       els.trainingNext.classList.add("ready");
-      els.trainingNext.querySelector("span").textContent = "NEXT";
+      els.trainingNext.querySelector("span").textContent = tr("next");
       positionTrainingGuidance();
     },step.after));
   }
@@ -1362,7 +1372,7 @@ function addMessage(channel, name, message, options = {}) {
   const entry = {
     id: options.id || `local-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     name,
-    message,
+    message: channel === "admins" || name === "system" || options.localize ? trPhrase(message) : message,
     time: options.time || messageTime(),
     admin: options.admin ?? channel === "admins",
     accent: options.accent,
@@ -1393,9 +1403,9 @@ function channelMessageHtml(entry, animate = false) {
     : "this.hidden=true";
   const avatar = entry.avatar ? `<img src="${escapeHtml(entry.avatar)}" alt="" onerror="${avatarError}">` : "";
   const scamTag = "";
-  const status = entry.banned ? `<span class="moderation-state">BANNED</span>` : "";
-  const text = entry.deleted ? `<em class="deleted-message">Message deleted by moderator</em>` : escapeHtml(entry.message);
-  const menu = entry.scam ? `<div class="message-menu-wrap"><button class="message-more" type="button" data-message-menu="${escapeHtml(entry.id)}" aria-label="Moderation actions">•••</button><div class="message-actions" ${entry.menuOpen ? "" : "hidden"}><button type="button" data-message-action="delete" data-message-id="${escapeHtml(entry.id)}" ${entry.deleted ? "disabled" : ""}>${entry.deleted ? "✓ Deleted" : "Delete message"}</button><button type="button" data-message-action="ban" data-message-id="${escapeHtml(entry.id)}" ${entry.banned ? "disabled" : ""}>${entry.banned ? "✓ Banned" : "Ban member"}</button></div></div>` : "";
+  const status = entry.banned ? `<span class="moderation-state">${escapeHtml(trPhrase("BANNED"))}</span>` : "";
+  const text = entry.deleted ? `<em class="deleted-message">${escapeHtml(trPhrase("Message deleted by moderator"))}</em>` : escapeHtml(entry.message);
+  const menu = entry.scam ? `<div class="message-menu-wrap"><button class="message-more" type="button" data-message-menu="${escapeHtml(entry.id)}" aria-label="${escapeHtml(trPhrase("Moderation actions"))}">•••</button><div class="message-actions" ${entry.menuOpen ? "" : "hidden"}><button type="button" data-message-action="delete" data-message-id="${escapeHtml(entry.id)}" ${entry.deleted ? "disabled" : ""}>${entry.deleted ? `✓ ${escapeHtml(trPhrase("Deleted"))}` : escapeHtml(trPhrase("Delete message"))}</button><button type="button" data-message-action="ban" data-message-id="${escapeHtml(entry.id)}" ${entry.banned ? "disabled" : ""}>${entry.banned ? `✓ ${escapeHtml(trPhrase("Banned"))}` : escapeHtml(trPhrase("Ban member"))}</button></div></div>` : "";
   const trainingFocus = entry.trainingFocus ? ` data-training-focus="${escapeHtml(entry.trainingFocus)}"` : "";
   return `<article class="discord-message ${entry.admin ? "admin" : ""} ${entry.scam ? "scam-message" : ""} ${entry.menuOpen ? "menu-open" : ""} ${animate ? "message-new" : ""}" style="--accent:${color}" data-message-id="${escapeHtml(entry.id)}"${trainingFocus}><span class="discord-avatar"><span>${escapeHtml(entry.name.slice(0,1).toUpperCase())}</span>${avatar}</span><div class="discord-copy"><div class="discord-message-meta"><strong>${escapeHtml(entry.name)}</strong><time>${escapeHtml(entry.time)}</time>${scamTag}${status}</div><p>${text}</p></div>${menu}</article>`;
 }
@@ -1415,8 +1425,8 @@ function renderChannel() {
   const previousScrollTop = els.channelFeed.scrollTop;
   const keepModerationMenuInPlace = state.messages[channel].some(entry => entry.menuOpen);
   els.channelName.textContent = channel;
-  els.channelTopic.textContent = channel === "general" ? "Community lobby · live" : "Staff notices · read only";
-  els.compose.textContent = channel === "general" ? "Message #general" : "Only administrators can post here";
+  els.channelTopic.textContent = channel === "general" ? tr("communityLobby") : tr("staffNotices");
+  els.compose.textContent = channel === "general" ? tr("messageChannel", { channel: "general" }) : trPhrase("Only administrators can post here");
   els.channelFeed.innerHTML = state.messages[channel].map(entry => channelMessageHtml(entry)).join("");
   els.channelFeed.scrollTop = keepModerationMenuInPlace ? previousScrollTop : els.channelFeed.scrollHeight;
   state.unread[channel] = 0;
@@ -1453,15 +1463,15 @@ function setApp(app, mode = "") {
       screen.hidden = !active;
     });
     document.querySelectorAll(".verify-button").forEach(button => button.classList.toggle("active", button.dataset.app === app && (!mode || button.dataset.tool === mode)));
-    const titles = { search: "SERVER SEARCH", aliases: "USERNAME RECORDS", account: "ACCOUNT DETAILS", phone: "PHONE LOOKUP", device: "DEVICE CHECK", x: "X PROFILE" };
-    els.toolTitle.textContent = titles[mode] || (app === "x" ? "X PROFILE" : "SERVER SEARCH");
+    const titles = { search: tr("serverSearch"), aliases: trPhrase("USERNAME RECORDS"), account: tr("accountDetails"), phone: tr("phoneLookup"), device: tr("deviceCheck"), x: tr("xProfile").toUpperCase() };
+    els.toolTitle.textContent = titles[mode] || (app === "x" ? tr("xProfile").toUpperCase() : tr("serverSearch"));
     if (app === "database" && !["phone", "device"].includes(mode)) {
       state.activeDatabaseMode = mode || "search";
       prefillInput(els.databaseInput, applicantDiscordUsername().replace(/^@/, ""));
       const prompts = {
-        search: ["⌕", "SERVER SEARCH", "Enter a username to search members who are already on the server."],
-        aliases: ["≈", "SIMILAR USERNAMES", "Enter a username to find close matches among server members."],
-        account: ["▤", "ACCOUNT DETAILS", "Enter the applicant's exact username to open their account record."]
+        search: ["⌕", tr("serverSearch"), trPhrase("Enter a username to search members who are already on the server.")],
+        aliases: ["≈", trPhrase("USERNAME RECORDS"), trPhrase("Enter a username to find close matches among server members.")],
+        account: ["▤", tr("accountDetails"), trPhrase("Enter the applicant's exact username to open their account record.")]
       };
       const prompt = prompts[state.activeDatabaseMode] || prompts.search;
       els.databaseResults.innerHTML = emptyTool(prompt[0], prompt[1], prompt[2]);
@@ -1481,7 +1491,7 @@ function setApp(app, mode = "") {
       const v = current();
       const canPrefillX = v.xHandle !== "—" && (!isXHidden(v) || state.revealed.x);
       prefillInput(els.xInput, canPrefillX ? v.xHandle.replace(/^@/, "") : "");
-      els.xResults.innerHTML = emptyTool("𝕏", "PROFILE LOOKUP", canPrefillX ? "Review the handle, then press OPEN yourself." : "Connect the missing X field to the applicant first.");
+      els.xResults.innerHTML = emptyTool("𝕏", tr("profileLookup"), canPrefillX ? trPhrase("Review the handle, then press OPEN yourself.") : trPhrase("Connect the missing X field to the applicant first."));
       setTimeout(() => els.xInput.focus(), 0);
     }
     if (state.training.active) {
@@ -1508,14 +1518,14 @@ function setApp(app, mode = "") {
 
 function applicantBio(v) {
   const bios = {
-    Builder: "I build small games and tools. Here for the jam.",
-    Artist: "I draw creatures, environments and game art.",
-    Clipmaker: "I make short clips for games and launches.",
-    Member: "Here to hang out with the Dlicom community.",
-    Admin: "Dlicom staff account. Working the late shift.",
-    Moderator: "Community moderation and lobby support."
+    Builder: tr("bioBuilder"),
+    Artist: tr("bioArtist"),
+    Clipmaker: tr("bioClipmaker"),
+    Member: tr("bioMember"),
+    Admin: tr("bioAdmin"),
+    Moderator: tr("bioModerator")
   };
-  return v.bio || bios[v.role] || "Here for the Dlicom community night shift.";
+  return v.bio ? trPhrase(v.bio) : (bios[v.role] || tr("firstTimeBio"));
 }
 
 function evidenceQuestion(v, reason) {
@@ -1613,12 +1623,12 @@ function applicantQuestions(v) {
   if (state.phoneLinkedOpened && v.phone.linkedAccounts.length > 1) {
     contextual.push({ id: "phone-linked", question: "Why is this number linked to several accounts?", answer: v.phone.linkedAccountsAnswer });
   }
-  return [...base, ...contextual];
+  return [...base, ...contextual].map(item => ({ ...item, question: trPhrase(item.question), answer: trPhrase(item.answer) }));
 }
 
 function roleValueHtml(role) {
   const icon = role === "Builder" ? `<img class="role-icon" src="assets/icons/builder.svg" alt="">` : "";
-  return `${icon}<b>${escapeHtml(role)}</b>`;
+  return `${icon}<b>${escapeHtml(tr(`role${role}`))}</b>`;
 }
 
 function cardHtml(v, animatedField = "") {
@@ -1626,29 +1636,29 @@ function cardHtml(v, animatedField = "") {
   const bioVisible = Boolean(v.bio) || state.revealed.bio;
   const phone = v.phone.applicationNumber
     ? `<strong>${escapeHtml(v.phone.applicationNumber)}</strong>`
-    : `<strong><em class="card-missing">Not provided</em></strong>`;
+    : `<strong><em class="card-missing">${escapeHtml(tr("notProvided"))}</em></strong>`;
   const phoneClass = "card-data-field phone-field connectable";
   const phoneAttribute = v.phone.applicationNumber
     ? ` data-connect-key="application-phone"`
     : ` data-connect-key="missing-phone"`;
   const xValue = xVisible
-    ? `<strong class="card-x-copy" data-copy-x="${escapeHtml(v.xHandle)}" role="button" tabindex="0" aria-label="Copy X username ${escapeHtml(v.xHandle)}">${escapeHtml(v.xHandle)}</strong>`
-    : `<strong><em class="card-missing">Not provided</em></strong>`;
+    ? `<strong class="card-x-copy" data-copy-x="${escapeHtml(v.xHandle)}" role="button" tabindex="0" aria-label="${escapeHtml(tr("copyXUsername"))} ${escapeHtml(v.xHandle)}">${escapeHtml(v.xHandle)}</strong>`
+    : `<strong><em class="card-missing">${escapeHtml(tr("notProvided"))}</em></strong>`;
   const xClass = `card-data-field x-field${animatedField === "x" ? " field-reveal" : ""}${xVisible ? "" : " connectable"}`;
   const xAttribute = xVisible ? "" : ` data-connect-key="missing-x"`;
-  const bioValue = bioVisible ? escapeHtml(applicantBio(v)) : `<em class="card-missing">Not provided</em>`;
+  const bioValue = bioVisible ? escapeHtml(applicantBio(v)) : `<em class="card-missing">${escapeHtml(tr("notProvided"))}</em>`;
   return `<article class="applicant-sheet">
     <div class="applicant-photo"><img src="${escapeHtml(v.avatar || "assets/dlicom-builder.png")}" alt="${escapeHtml(v.name)}"></div>
     <div class="applicant-section applicant-main">
-      <div class="card-data-field"><span>Display name</span><strong>${escapeHtml(v.name)}</strong></div>
-      <div class="card-data-field"><span>Username</span><strong class="card-username-copy" data-copy-username="${escapeHtml(v.username)}" role="button" tabindex="0" aria-label="Copy Discord username ${escapeHtml(v.username)}">${escapeHtml(v.username)}</strong></div>
-      <div class="card-data-field role-field"><span>Requested role</span><strong class="role-value">${roleValueHtml(v.role)}</strong></div>
-      <div class="card-data-field"><span>Account created</span><strong>${escapeHtml(v.created)}</strong></div>
+      <div class="card-data-field"><span>${escapeHtml(tr("displayName"))}</span><strong>${escapeHtml(v.name)}</strong></div>
+      <div class="card-data-field"><span>${escapeHtml(tr("username"))}</span><strong class="card-username-copy" data-copy-username="${escapeHtml(v.username)}" role="button" tabindex="0" aria-label="${escapeHtml(trPhrase("Copy Discord username"))} ${escapeHtml(v.username)}">${escapeHtml(v.username)}</strong></div>
+      <div class="card-data-field role-field"><span>${escapeHtml(tr("requestedRole"))}</span><strong class="role-value">${roleValueHtml(v.role)}</strong></div>
+      <div class="card-data-field"><span>${escapeHtml(tr("accountCreated"))}</span><strong>${escapeHtml(trPhrase(v.created))}</strong></div>
     </div>
     <div class="applicant-section applicant-contact">
-      <div class="${phoneClass}"${phoneAttribute}><span>Phone number</span>${phone}</div>
-      <div class="${xClass}"${xAttribute}><span>X (Twitter)</span>${xValue}</div>
-      <div class="card-data-field card-bio ${animatedField === "bio" ? "field-reveal" : ""}"><span>Short bio</span><strong>${bioValue}</strong></div>
+      <div class="${phoneClass}"${phoneAttribute}><span>${escapeHtml(tr("phoneNumber"))}</span>${phone}</div>
+      <div class="${xClass}"${xAttribute}><span>${escapeHtml(tr("xTwitter"))}</span>${xValue}</div>
+      <div class="card-data-field card-bio ${animatedField === "bio" ? "field-reveal" : ""}"><span>${escapeHtml(tr("shortBio"))}</span><strong>${bioValue}</strong></div>
     </div>
   </article>`;
 }
@@ -1670,14 +1680,14 @@ function revealPhoneLookup() {
   state.pendingCardAnimation = "phone";
   const v = current();
   const linkedList = state.phoneLinkedOpened
-    ? `<div class="phone-linked-list">${v.phone.linkedAccounts.map(account => `<button type="button" data-linked-account="${escapeHtml(account)}"><span>${escapeHtml(account)}</span><small>SEARCH SERVER →</small></button>`).join("")}</div>`
+    ? `<div class="phone-linked-list">${v.phone.linkedAccounts.map(account => `<button type="button" data-linked-account="${escapeHtml(account)}"><span>${escapeHtml(account)}</span><small>${escapeHtml(tr("serverSearch"))} →</small></button>`).join("")}</div>`
     : "";
   els.databaseResults.innerHTML = `<article class="phone-lookup-card">
-    <header><span>PHONE LOOKUP</span><button class="phone-lookup-number connectable" type="button" data-connect-key="lookup-phone">${escapeHtml(v.phone.accountNumber)}</button></header>
+    <header><span>${escapeHtml(tr("phoneLookup"))}</span><button class="phone-lookup-number connectable" type="button" data-connect-key="lookup-phone">${escapeHtml(v.phone.accountNumber)}</button></header>
     <div class="phone-lookup-grid">
-      <button class="phone-lookup-field connectable" type="button" data-connect-key="phone-status"><span>VERIFIED</span><strong>${v.phone.verified ? "YES" : "NO"}</strong></button>
-      <div class="phone-lookup-field"><span>VERIFIED SINCE</span><strong>${escapeHtml(v.phone.verifiedSince)}</strong></div>
-      <div class="phone-lookup-field phone-linked-field connectable" data-connect-key="phone-linked"><span>LINKED ACCOUNTS</span><strong>${v.phone.linkedAccounts.length}</strong><button type="button" data-phone-linked>${state.phoneLinkedOpened ? "LIST OPEN" : "VIEW LIST"}</button></div>
+      <button class="phone-lookup-field connectable" type="button" data-connect-key="phone-status"><span>${escapeHtml(trPhrase("VERIFIED"))}</span><strong>${escapeHtml(trPhrase(v.phone.verified ? "YES" : "NO"))}</strong></button>
+      <div class="phone-lookup-field"><span>${escapeHtml(trPhrase("VERIFIED SINCE"))}</span><strong>${escapeHtml(trPhrase(v.phone.verifiedSince))}</strong></div>
+      <div class="phone-lookup-field phone-linked-field connectable" data-connect-key="phone-linked"><span>${escapeHtml(trPhrase("LINKED ACCOUNTS"))}</span><strong>${v.phone.linkedAccounts.length}</strong><button type="button" data-phone-linked>${escapeHtml(trPhrase(state.phoneLinkedOpened ? "LIST OPEN" : "VIEW LIST"))}</button></div>
     </div>${linkedList}
   </article>`;
   if (firstLookup && v.phone.verifiedRecently) phoneQuestionUnlock("phone-recent");
@@ -1691,17 +1701,17 @@ function revealDeviceCheck() {
     ...v.device.accounts.map(account => `<button type="button" class="device-account" data-device-account="${escapeHtml(account.name)}"><span>${escapeHtml(account.name)}</span></button>`)
   ].join("");
   els.databaseResults.innerHTML = `<article class="device-check-card">
-    <header><span>DEVICE CHECK</span><strong>LOCAL FINGERPRINT</strong></header>
+    <header><span>${escapeHtml(tr("deviceCheck"))}</span><strong>${escapeHtml(trPhrase("LOCAL FINGERPRINT"))}</strong></header>
     <div class="device-check-summary">
-      <button class="device-id-field connectable" type="button" data-connect-key="device-id"><span>DEVICE ID</span><strong>${escapeHtml(v.device.id)}</strong></button>
-      <button class="device-count-field connectable" type="button" data-connect-key="device-accounts"><span>ACCOUNTS ON THIS DEVICE</span><strong>${v.device.accounts.length + 1}</strong></button>
+      <button class="device-id-field connectable" type="button" data-connect-key="device-id"><span>${escapeHtml(trPhrase("DEVICE ID"))}</span><strong>${escapeHtml(v.device.id)}</strong></button>
+      <button class="device-count-field connectable" type="button" data-connect-key="device-accounts"><span>${escapeHtml(trPhrase("ACCOUNTS ON THIS DEVICE"))}</span><strong>${v.device.accounts.length + 1}</strong></button>
     </div>
-    <div class="device-account-list"><span class="device-list-label">ACCOUNT USERNAMES</span>${accountButtons}</div>
+    <div class="device-account-list"><span class="device-list-label">${escapeHtml(trPhrase("ACCOUNT USERNAMES"))}</span>${accountButtons}</div>
   </article>`;
 }
 
 function emptyTool(icon, title, message) {
-  return `<div class="empty-tool"><span>${icon}</span><strong>${escapeHtml(title)}</strong><p>${escapeHtml(message)}</p></div>`;
+  return `<div class="empty-tool"><span>${icon}</span><strong>${escapeHtml(trPhrase(title))}</strong><p>${escapeHtml(trPhrase(message))}</p></div>`;
 }
 
 function serverDirectoryRecords(v) {
@@ -1716,7 +1726,7 @@ function serverDirectoryRecords(v) {
 
 function searchDatabase(rawQuery, shouldRender = true) {
   const query = normalizeHandle(rawQuery);
-  if (!query) throw new Error("Enter a username first");
+  if (!query) throw new Error(trPhrase("Enter a username first"));
   const v = current();
   const mode = state.activeDatabaseMode;
   const applicant = mode === "account" && query === normalizeHandle(v.username);
@@ -1759,9 +1769,9 @@ function showDatabaseProfile(kind, index = 0) {
     const banned = bans > 0;
     const status = result.status || (banned ? "BANNED" : /online/i.test(result.note) ? "ONLINE" : "ON FILE");
     const deviceFields = result.deviceLinked
-      ? `<div class="profile-field"><span>ACCOUNT AGE</span><strong>${escapeHtml(result.age || "Unknown")}</strong></div><div class="profile-field"><span>STATUS</span><strong class="${banned ? "bad" : "good"}">${escapeHtml(status)}</strong></div><div class="profile-field connectable" data-connect-key="device-ban" data-device-account="${escapeHtml(result.name)}" data-device-bans="${bans}"><span>PREVIOUS BANS</span><strong class="${banned ? "bad" : ""}">${bans}</strong></div>`
-      : `<div class="profile-field connectable" data-connect-key="membership"><span>MEMBERSHIP</span><strong>${banned ? "HISTORICAL RECORD" : "ACTIVE RECORD"}</strong></div><div class="profile-field connectable" data-connect-key="status"><span>STATUS</span><strong class="${banned ? "bad" : "good"}">${escapeHtml(status)}</strong></div>`;
-    els.databaseResults.innerHTML = `<div class="profile-sheet"><div class="profile-title"><span>${escapeHtml(result.name.slice(1,2).toUpperCase() || "M")}</span><div><strong>${escapeHtml(result.name)}</strong><small>${result.deviceLinked ? "DEVICE-LINKED RECORD" : "DIRECTORY RECORD"}</small></div>${back}</div><div class="profile-grid">${deviceFields}</div><p class="profile-note">${escapeHtml(result.note)}</p></div>`;
+      ? `<div class="profile-field"><span>${escapeHtml(trPhrase("ACCOUNT AGE"))}</span><strong>${escapeHtml(trPhrase(result.age || "Unknown"))}</strong></div><div class="profile-field"><span>${escapeHtml(trPhrase("STATUS"))}</span><strong class="${banned ? "bad" : "good"}">${escapeHtml(trPhrase(status))}</strong></div><div class="profile-field connectable" data-connect-key="device-ban" data-device-account="${escapeHtml(result.name)}" data-device-bans="${bans}"><span>${escapeHtml(trPhrase("PREVIOUS BANS"))}</span><strong class="${banned ? "bad" : ""}">${bans}</strong></div>`
+      : `<div class="profile-field connectable" data-connect-key="membership"><span>${escapeHtml(trPhrase("MEMBERSHIP"))}</span><strong>${escapeHtml(trPhrase(banned ? "HISTORICAL RECORD" : "ACTIVE RECORD"))}</strong></div><div class="profile-field connectable" data-connect-key="status"><span>${escapeHtml(trPhrase("STATUS"))}</span><strong class="${banned ? "bad" : "good"}">${escapeHtml(trPhrase(status))}</strong></div>`;
+    els.databaseResults.innerHTML = `<div class="profile-sheet"><div class="profile-title"><span>${escapeHtml(result.name.slice(1,2).toUpperCase() || "M")}</span><div><strong>${escapeHtml(result.name)}</strong><small>${escapeHtml(trPhrase(result.deviceLinked ? "DEVICE-LINKED RECORD" : "DIRECTORY RECORD"))}</small></div>${back}</div><div class="profile-grid">${deviceFields}</div><p class="profile-note">${escapeHtml(trPhrase(result.note))}</p></div>`;
   }
 }
 
@@ -1798,7 +1808,7 @@ function drawConnection(sourceElement, targetElement, success, label) {
   wire.style.setProperty("--wire-angle", `${angle}deg`);
   caption.style.left = `${startX + (endX - startX) / 2}px`;
   caption.style.top = `${startY + (endY - startY) / 2}px`;
-  caption.textContent = label;
+  caption.textContent = trPhrase(label);
   document.documentElement.classList.add("connection-active");
   document.body.append(wire, caption);
   state.connectionTimer = setTimeout(clearConnectionVisual, 1350);
@@ -1815,7 +1825,7 @@ function selectEvidence(element) {
   };
   element.classList.add("evidence-selected");
   prepareMobileEvidenceMode(element);
-  showToast("EVIDENCE SELECTED // CHOOSE A TARGET", "admin");
+  showToast(tr("evidencePicked"), "admin");
   beep("click");
   if (state.training.active) trainingAction(`evidence:${state.selectedEvidence.key}`);
 }
@@ -1849,10 +1859,10 @@ function resolveEvidenceConnection(targetElement, targetKey) {
   const reason = ageComparedToRule || regularMascotConnection ? connectedRejectReason(selected, current()) : "";
   const success = Boolean(reason);
   const rejectReason = Boolean(REJECT_REASONS[reason]);
-  drawConnection(sourceElement, targetElement, success, success ? (rejectReason ? "CONNECTION FOUND // EVIDENCE LOGGED" : "CONNECTION FOUND // QUESTION UNLOCKED") : "NO CONNECTION");
+  drawConnection(sourceElement, targetElement, success, success ? (rejectReason ? tr("connectionEvidence") : tr("connectionQuestion")) : tr("noConnection"));
   clearEvidenceSelection();
   if (!success) {
-    showToast("NO CONNECTION", "reject");
+    showToast(tr("noConnection"), "reject");
     beep("reject");
     return;
   }
@@ -1964,12 +1974,12 @@ function metricIcon(type) {
 
 function searchX(rawQuery, shouldRender = true) {
   const query = normalizeHandle(rawQuery);
-  if (!query) throw new Error("Enter an X handle first");
+  if (!query) throw new Error(trPhrase("Enter an X handle first"));
   const v = current();
   const found = Boolean(v.x && query === normalizeHandle(v.xHandle));
   if (found && shouldRender) state.xProfileOpened = true;
   if (shouldRender) {
-    els.xResults.innerHTML = found ? `<div class="lookup-summary"><span>PROFILE // @${escapeHtml(query)}</span><b>1 RESULT</b></div><article class="x-profile-card"><h3>${escapeHtml(v.xHandle)}</h3><p>Joined ${escapeHtml(v.x.since)}</p><div class="x-stats"><span><b>${escapeHtml(v.x.followers)}</b> followers</span><span><b>${escapeHtml(v.x.following)}</b> following</span><span><b>${escapeHtml(v.x.likes)}</b> likes</span></div><div class="x-evidence-grid"><button class="x-evidence connectable" type="button" data-connect-key="x-metrics"><span>ENGAGEMENT</span><b>Connect metrics</b></button><button class="x-evidence connectable" type="button" data-connect-key="role-proof"><span>ROLE CLAIM</span><b>Connect posts</b></button></div>${v.x.posts.map((post, index) => { const metrics = postMetrics(v, index); return `<div class="x-profile-post" data-post-index="${index}"${index === 0 ? ` data-training-post="role-proof"` : ""}><p>${escapeHtml(post)}</p><div class="post-stats"><span>${metricIcon("views")}<b>${formatMetric(metrics.views)}</b> views</span><span>${metricIcon("likes")}<b>${formatMetric(metrics.likes)}</b></span><span>${metricIcon("reposts")}<b>${formatMetric(metrics.reposts)}</b></span><span>${metricIcon("replies")}<b>${formatMetric(metrics.replies)}</b></span></div></div>`; }).join("")}</article>` : emptyTool("0", "PROFILE NOT FOUND", "No public profile matches that exact handle.");
+    els.xResults.innerHTML = found ? `<div class="lookup-summary"><span>${escapeHtml(trPhrase("PROFILE"))} // @${escapeHtml(query)}</span><b>1 ${escapeHtml(trPhrase("RESULT"))}</b></div><article class="x-profile-card"><h3>${escapeHtml(v.xHandle)}</h3><p>${escapeHtml(trPhrase("Joined"))} ${escapeHtml(v.x.since)}</p><div class="x-stats"><span><b>${escapeHtml(v.x.followers)}</b> ${escapeHtml(trPhrase("followers"))}</span><span><b>${escapeHtml(v.x.following)}</b> ${escapeHtml(trPhrase("following"))}</span><span><b>${escapeHtml(v.x.likes)}</b> ${escapeHtml(trPhrase("likes"))}</span></div><div class="x-evidence-grid"><button class="x-evidence connectable" type="button" data-connect-key="x-metrics"><span>${escapeHtml(trPhrase("ENGAGEMENT"))}</span><b>${escapeHtml(trPhrase("Connect metrics"))}</b></button><button class="x-evidence connectable" type="button" data-connect-key="role-proof"><span>${escapeHtml(trPhrase("ROLE CLAIM"))}</span><b>${escapeHtml(trPhrase("Connect posts"))}</b></button></div>${v.x.posts.map((post, index) => { const metrics = postMetrics(v, index); return `<div class="x-profile-post" data-post-index="${index}"${index === 0 ? ` data-training-post="role-proof"` : ""}><p>${escapeHtml(trPhrase(post))}</p><div class="post-stats"><span>${metricIcon("views")}<b>${formatMetric(metrics.views)}</b> ${escapeHtml(trPhrase("views"))}</span><span>${metricIcon("likes")}<b>${formatMetric(metrics.likes)}</b></span><span>${metricIcon("reposts")}<b>${formatMetric(metrics.reposts)}</b></span><span>${metricIcon("replies")}<b>${formatMetric(metrics.replies)}</b></span></div></div>`; }).join("")}</article>` : emptyTool("0", trPhrase("PROFILE NOT FOUND"), trPhrase("No public profile matches that exact handle."));
   }
   return { query, found, profile: found ? v.x : null };
 }
@@ -1980,8 +1990,8 @@ function resetTabletTools() {
   const v = current();
   const canPrefillX = v.xHandle !== "—" && (!isXHidden(v) || state.revealed.x);
   prefillInput(els.xInput, canPrefillX ? v.xHandle.replace(/^@/, "") : "");
-  els.databaseResults.innerHTML = emptyTool("⌕", "NO QUERY", "Use the name on the applicant card, or search any claimed inviter.");
-  els.xResults.innerHTML = emptyTool("𝕏", "PROFILE LOOKUP", "Enter the handle shown on the applicant card.");
+  els.databaseResults.innerHTML = emptyTool("⌕", tr("noQuery"), tr("noQueryHint"));
+  els.xResults.innerHTML = emptyTool("𝕏", tr("profileLookup"), tr("enterHandle"));
 }
 
 function renderQuestions() {
@@ -2059,12 +2069,13 @@ function hideVisitorIntro() {
 function showSoloVisitorLine(v, text, fadeAt, hideAt) {
   hideConversation();
   hideVisitorIntro();
-  els.answer.textContent = text;
+  const localizedText = trPhrase(text);
+  els.answer.textContent = localizedText;
   els.answerSpeaker.textContent = v.name.toUpperCase();
   els.conversation.classList.add("solo-reply");
   els.conversation.hidden = false;
   els.stage.classList.add("talking");
-  playAlienSpeech(text);
+  playAlienSpeech(localizedText);
   state.introTimers.push(setTimeout(() => els.answer.closest(".dialogue-line")?.classList.add("leaving"), fadeAt));
   state.introTimers.push(setTimeout(() => {
     els.conversation.hidden = true;
@@ -2300,15 +2311,15 @@ function renderVisitor() {
   els.adminReview.hidden = true;
   state.revealed = { phone: false, x: false, bio: false };
   els.accept.disabled = true; els.reject.disabled = true;
-  els.caseId.textContent = `CASE // ${String(state.index + 1).padStart(3,"0")}`;
+  els.caseId.textContent = `${tr("case")} // ${String(state.index + 1).padStart(3,"0")}`;
   els.progressLabel.textContent = `${String(state.index).padStart(2,"0")} / ${visitors.length}`;
   els.progress.style.width = `${(state.index / visitors.length) * 100}%`;
   renderShiftClock();
   els.speaker.textContent = v.name.toUpperCase();
-  els.intro.textContent = v.intro;
-  els.visitorButton.setAttribute("aria-label", `Talk to ${v.name}`);
+  els.intro.textContent = trPhrase(v.intro);
+  els.visitorButton.setAttribute("aria-label", `${tr("ask")} ${v.name}`);
   renderCard();
-  els.checks.textContent = "check the records";
+  els.checks.textContent = tr("checkRecords").toLowerCase();
   renderQuestions();
   resetTabletTools();
   hideVisitorIntro();
@@ -2322,7 +2333,7 @@ function renderVisitor() {
 }
 
 function showToast(message, tone) {
-  els.toast.textContent = message;
+  els.toast.textContent = trPhrase(message);
   els.toast.style.color = tone === "reject" ? "var(--coral)" : tone === "admin" ? "var(--yellow)" : "var(--cyan)";
   els.toast.classList.add("show");
   setTimeout(() => els.toast.classList.remove("show"), 1250);
@@ -2335,10 +2346,10 @@ async function copyApplicantValue(target) {
   const value = source.replace(/^@/, "");
   try {
     await navigator.clipboard.writeText(value);
-    showToast(`@${value} COPIED`, "accept");
+    showToast(`@${value} ${tr("copied")}`, "accept");
     beep("click");
   } catch (_) {
-    showToast("COPY FAILED // TRY AGAIN", "reject");
+    showToast(tr("copyFailed"), "reject");
   }
 }
 
@@ -2506,7 +2517,7 @@ function scheduleCommunityContribution(v) {
   const message = contributions[v.role] || "glad to be here — the lobby feels alive tonight";
   const timer = setTimeout(() => {
     if (!state.started || state.ended) return;
-    addMessage("general", v.name, message, { accent: "#7cf7d4", avatar: v.avatar });
+    addMessage("general", v.name, message, { accent: "#7cf7d4", avatar: v.avatar, localize: true });
   }, 9000 + (state.index % 3) * 2500);
   state.communityTimers.push(timer);
 }
@@ -2530,7 +2541,7 @@ function openRejectMenu() {
   const reasons = availableRejectReasons();
   els.rejectReasons.innerHTML = reasons.map(key => {
     const [title, description] = REJECT_REASONS[key];
-    return `<button class="reject-reason ${key === "deny_anyway" ? "no-evidence" : ""}" type="button" data-reject-reason="${key}"><span><strong>${escapeHtml(title)}</strong><small>${escapeHtml(description)}</small></span><span>→</span></button>`;
+    return `<button class="reject-reason ${key === "deny_anyway" ? "no-evidence" : ""}" type="button" data-reject-reason="${key}"><span><strong>${escapeHtml(trPhrase(title))}</strong><small>${escapeHtml(trPhrase(description))}</small></span><span>→</span></button>`;
   }).join("");
   els.rejectOverlay.hidden = false;
   els.rejectReasons.querySelector(".reject-reason")?.focus();
@@ -2551,11 +2562,13 @@ function postDecisionConsequence(v, consequence) {
   setTimeout(() => {
     if (state.ended) return;
     if (applicantIsSpeaker) {
-      addMessage("general", v.name, adaptedMessage, { avatar: v.avatar });
+      addMessage("general", v.name, adaptedMessage, { avatar: v.avatar, localize: true });
     } else if (consequence[0] === "system") {
       addMessage("general", "system", adaptedMessage, { accent: "#ff6f79" });
     } else {
-      addCastMessage("witness", adaptedMessage);
+      const actor = state.chatCast.witness || state.chatCast.observer;
+      if (actor) addMessage("general", actor.name, trPhrase(adaptedMessage), { avatar: actor.avatar, accent: actor.accent });
+      else addMessage("general", "community", trPhrase(adaptedMessage), { localize: true });
     }
   }, 800);
 }
@@ -2605,7 +2618,7 @@ function decide(choice, rejectReason = "") {
   state.decisions.push({ username: v.username, identityKey: v.identityKey, choice, rejectReason, correct, points });
   beep(choice);
   const rejectLabel = REJECT_REASONS[rejectReason]?.[0];
-  showToast(accepted ? "ACCESS GRANTED // LOGGED" : `${rejectLabel || "ENTRY DENIED"} // LOGGED`, choice);
+  showToast(accepted ? `${tr("accessGranted")} // ${trPhrase("LOGGED")}` : `${trPhrase(rejectLabel || tr("entryDenied"))} // ${trPhrase("LOGGED")}`, choice);
   const departureDelay = showDecisionExitLine(v, decisionExitLine(v, accepted, correct, rejectReason));
   const visitorMarker = state.index;
   setTimeout(() => {
@@ -2646,7 +2659,7 @@ function nextVisitor() {
   const update = adminUpdates[state.index];
   if (update) {
     addMessage("admins", update[0], update[1]);
-    showToast("NEW MESSAGE // #ADMINS", "admin");
+    showToast(`${trPhrase("NEW MESSAGE")} // #ADMINS`, "admin");
   }
 }
 
@@ -2690,9 +2703,9 @@ function finishShift(lossType = "") {
     fired: ["MODERATOR DISMISSED", "Too many applicants were rejected without supporting evidence."]
   };
   const ending = lossCopy[lossType];
-  $("endEyebrow").textContent = ending ? "SHIFT FAILED" : "06:00 · SHIFT COMPLETE";
-  $("endTitle").textContent = ending ? ending[0] : "SHIFT COMPLETE";
-  $("finalScore").textContent = finalScore.toLocaleString("en-US");
+  $("endEyebrow").textContent = ending ? tr("shiftFailed") : `06:00 · ${tr("shiftComplete")}`;
+  $("endTitle").textContent = ending ? trPhrase(ending[0]) : tr("shiftComplete");
+  $("finalScore").textContent = finalScore.toLocaleString(localeCode());
   $("correctStat").textContent = `${correct} / ${visitors.length}`;
   $("mistakesStat").textContent = mistakes;
   $("stoppedStat").textContent = state.threatsStopped;
@@ -2707,7 +2720,7 @@ function finishShift(lossType = "") {
   $("endClipmakers").textContent = state.community.clipmakers;
   $("endSupporters").textContent = state.community.supporters;
   $("endMembers").textContent = state.community.members;
-  $("endMessage").textContent = ending ? ending[1] : `Community survived. ${correct} correct decisions, ${mistakes} mistake${mistakes === 1 ? "" : "s"}, ${state.incidentsResolved} incident${state.incidentsResolved === 1 ? "" : "s"} contained.`;
+  $("endMessage").textContent = ending ? trPhrase(ending[1]) : tr("shiftSummary", { correct, mistakes, incidents: state.incidentsResolved });
   document.querySelector(".end-card")?.classList.toggle("failed", Boolean(ending));
   if (!ending) {
     els.progressLabel.textContent = `${visitors.length} / ${visitors.length}`;
@@ -2736,7 +2749,7 @@ async function startShift() {
   nextGeneralChat();
   adminBriefing.forEach((message, index) => addMessage("admins", message[0], message[1], { time: `01:${52 + index * 2}` }));
   renderVisitor();
-  if (state.poolFallback) showToast(`${selectedRegion} POOL EXHAUSTED // ALL SERVER BACKUP`, "admin");
+  if (state.poolFallback) showToast(tr("poolExhausted", { region: selectedRegion }), "admin");
   els.startButton.disabled = false;
 }
 
@@ -3016,6 +3029,23 @@ els.regionPicker?.addEventListener("click", event => {
   updatePoolStatus();
   beep("click");
 });
+els.languagePicker?.addEventListener("click", event => {
+  const button = event.target.closest("[data-language]");
+  if (!button || state.started) return;
+  window.DLICOM_I18N?.setLocale(button.dataset.language);
+  beep("click");
+});
+document.addEventListener("dlicom:languagechange", () => {
+  renderRegionPicker(Object.keys(regionalCounts), regionalCounts);
+  renderShiftRules();
+  renderChannel();
+  renderCard();
+  renderQuestions();
+  resetTabletTools();
+  els.soundLabel.textContent = state.sound ? tr("soundOn") : tr("soundOff");
+  els.chatSoundLabel.textContent = state.chatSound ? tr("chatOn") : tr("chatMuted");
+  if (state.training.active) renderTrainingMessage(currentTrainingStep()?.message || []);
+});
 els.startButton.addEventListener("click", startShift);
 els.trainingButton.addEventListener("click", startTraining);
 els.trainingNext.addEventListener("click", advanceTrainingStep);
@@ -3027,14 +3057,14 @@ $("restartButton").addEventListener("click", resetShift);
 els.soundButton.addEventListener("click", () => {
   state.sound = !state.sound;
   els.soundButton.setAttribute("aria-pressed", String(state.sound));
-  els.soundLabel.textContent = state.sound ? "SOUND ON" : "SOUND OFF";
+  els.soundLabel.textContent = state.sound ? tr("soundOn") : tr("soundOff");
   syncAudioMix();
   beep("click");
 });
 els.chatSoundButton.addEventListener("click", () => {
   state.chatSound = !state.chatSound;
   els.chatSoundButton.setAttribute("aria-pressed", String(state.chatSound));
-  els.chatSoundLabel.textContent = state.chatSound ? "CHAT ON" : "CHAT MUTED";
+  els.chatSoundLabel.textContent = state.chatSound ? tr("chatOn") : tr("chatMuted");
   syncAudioMix();
   beep("chatMessage");
 });
