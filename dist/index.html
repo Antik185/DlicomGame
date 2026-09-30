@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080916'/%3E%3Cpath d='M17 14h16c12 0 19 7 19 18s-7 18-19 18H17V14Zm12 10v16h4c6 0 9-3 9-8s-3-8-9-8h-4Z' fill='%237a74e8'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="styles.css?v=57">
+  <link rel="stylesheet" href="styles.css?v=58">
 </head>
 <body>
   <div class="room-glow" aria-hidden="true"></div>
@@ -42,7 +42,7 @@
       <aside class="chat-panel" id="chatPanel" aria-label="Dlicom Discord chat">
         <header class="discord-head">
           <div class="server-title-row">
-            <span class="discord-logo">D</span>
+            <span class="discord-logo"><img src="assets/dlicomLogo.jpg" alt="Dlicom"></span>
             <strong>DLICOM</strong>
           </div>
           <div class="server-overview">
@@ -162,7 +162,7 @@
       <aside class="right-rail">
         <section class="clock-panel" aria-label="Shift status">
           <div><strong id="shiftClock">02:17 AM</strong><span>SEP 24, 2026</span></div>
-          <div class="shift-count"><span>SHIFT</span><b id="progressLabel">00 / 14</b></div>
+          <div class="shift-count"><span>SHIFT</span><b id="progressLabel">00 / 20</b></div>
           <div class="meter-track"><i id="progressBar"></i></div>
           <button class="sound-button" id="soundButton" type="button" aria-pressed="true" aria-label="Toggle interface sounds"><span class="sound-bars" aria-hidden="true"><i></i><i></i><i></i></span><span id="soundLabel">SOUND ON</span></button>
           <label class="master-volume" for="volumeSlider"><span>VOL</span><input id="volumeSlider" type="range" min="0" max="100" value="85" step="1" aria-label="Game sound volume"><output id="volumeValue" for="volumeSlider">85%</output></label>
@@ -208,7 +208,7 @@
       <p>Read the staff channel, inspect each applicant, and make the call before sunrise.</p>
       <div class="briefing-grid">
         <div><span>SHIFT</span><strong>02:00 — 06:00</strong></div>
-        <div><span>QUEUE</span><strong>14 VISITORS</strong></div>
+        <div><span>QUEUE</span><strong>20 VISITORS</strong></div>
         <div><span>FIRST STEP</span><strong>READ #ADMINS</strong></div>
       </div>
       <section class="pool-selector" aria-labelledby="poolTitle">
@@ -283,7 +283,7 @@
         <span>Members <b id="endMembers">148</b></span>
       </div>
       <div class="report-stats">
-        <div><span>CORRECT CALLS</span><strong id="correctStat">0 / 14</strong></div>
+        <div><span>CORRECT CALLS</span><strong id="correctStat">0 / 20</strong></div>
         <div><span>MISTAKES</span><strong id="mistakesStat">0</strong></div>
         <div><span>SCAMMERS STOPPED</span><strong id="stoppedStat">0</strong></div>
         <div><span>IMPOSTORS CAUGHT</span><strong id="impostorsStat">0</strong></div>
@@ -295,6 +295,6 @@
   </section>
 
   <div class="toast" id="toast" role="status" aria-live="polite">DECISION LOGGED</div>
-  <script src="game.js?v=57"></script>
+  <script src="game.js?v=58"></script>
 </body>
 </html>

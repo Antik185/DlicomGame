@@ -133,6 +133,8 @@ const visitorTemplates = [
   }
 ];
 
+const NORMAL_SHIFT_VISITOR_COUNT = 20;
+
 // Phone evidence is deliberately stored outside the UI and visitor dialogue.
 // The three sources can disagree, leaving the comparison to the player.
 const PHONE_PROFILES = Object.freeze({
@@ -791,6 +793,10 @@ function applicantIdentity(template, person) {
 }
 
 function buildVisitorQueue() {
+  const queueTemplates = Array.from(
+    { length: NORMAL_SHIFT_VISITOR_COUNT },
+    (_, index) => visitorTemplates[index % visitorTemplates.length]
+  );
   const allPeople = regionalParticipants.length ? regionalParticipants : fallbackRosterFromGeneral();
   const regionalPool = selectedRegion === "ALL"
     ? allPeople
@@ -799,13 +805,13 @@ function buildVisitorQueue() {
   const personKey = person => person.key || person.discordId || normalizeHandle(person.username);
   const selectedIds = new Set(initialPool.map(personKey));
   const fillPool = shuffled(allPeople.filter(person => !selectedIds.has(personKey(person))));
-  const people = [...initialPool, ...fillPool].slice(0, visitorTemplates.length);
-  state.poolFallback = selectedRegion !== "ALL" && initialPool.length < visitorTemplates.length;
+  const people = [...initialPool, ...fillPool].slice(0, queueTemplates.length);
+  state.poolFallback = selectedRegion !== "ALL" && initialPool.length < queueTemplates.length;
 
-  if (people.length < visitorTemplates.length) {
-    visitors = visitorTemplates.map(prepareVisitorTemplate);
+  if (people.length < queueTemplates.length) {
+    visitors = queueTemplates.map(prepareVisitorTemplate);
   } else {
-    visitors = visitorTemplates.map((template, index) => applicantIdentity(prepareVisitorTemplate(template, index), people[index]));
+    visitors = queueTemplates.map((template, index) => applicantIdentity(prepareVisitorTemplate(template, index), people[index]));
   }
 
   state.applicantHandles = new Set(visitors.map(visitor => normalizeHandle(visitor.username)));
@@ -1103,7 +1109,10 @@ function positionTrainingGuidance(attempt = 0) {
     const belowTarget = anchor.bottom + 18;
     if (adminTop < 70 && belowTarget >= 12 && belowTarget + adminHeight < innerHeight - 12) adminTop = belowTarget;
     adminTop = Math.max(12,Math.min(innerHeight-adminHeight-12,adminTop));
-    if (isMobileLandscapeLayout() && !els.drawer.hidden) {
+    if (isMobileLandscapeLayout() && !els.toolTray.hidden) {
+      adminLeft = 8;
+      adminTop = 48;
+    } else if (isMobileLandscapeLayout() && !els.drawer.hidden) {
       adminLeft = Math.max(8,innerWidth-adminWidth-8);
       adminTop = Math.max(42,innerHeight-adminHeight-8);
     } else if (isMobileLandscapeLayout() && anchor.width > innerWidth * .55) {
@@ -1115,7 +1124,11 @@ function positionTrainingGuidance(attempt = 0) {
   } else {
     const mobile = isMobileLandscapeLayout();
     const adminWidth = els.trainingAdmin.getBoundingClientRect().width || (mobile ? 210 : 292);
-    els.trainingAdmin.style.left = mobile ? `${Math.max(8,innerWidth-adminWidth-8)}px` : `${Math.max(12,(innerWidth-Math.min(292,innerWidth-28))/2)}px`;
+    els.trainingAdmin.style.left = mobile && !els.toolTray.hidden
+      ? "8px"
+      : mobile
+        ? `${Math.max(8,innerWidth-adminWidth-8)}px`
+        : `${Math.max(12,(innerWidth-Math.min(292,innerWidth-28))/2)}px`;
     els.trainingAdmin.style.top = mobile ? "48px" : "68px";
     if (!step?.free && attempt < 10) {
       state.training.positionFrame = requestAnimationFrame(() => positionTrainingGuidance(attempt+1));
@@ -1490,6 +1503,7 @@ function setApp(app, mode = "") {
     }
   }
   beep("click");
+  if (state.training.active) requestAnimationFrame(() => positionTrainingGuidance());
 }
 
 function applicantBio(v) {
@@ -1550,6 +1564,12 @@ function evidenceQuestion(v, reason) {
       answer: v.xHandle === "—" ? "I don't use X." : `It's ${v.xHandle}.`,
       reveal: "x"
     },
+    missing_phone: {
+      question: "What phone number did you use?",
+      answer: `My number is ${v.phone.spokenNumber}.`,
+      hold: 6500,
+      after: "phone-number"
+    },
     role_unverified: {
       question: "How do your posts prove the role you requested?",
       answer: key === "@coolbuilder" ? "I build houses. I thought the Builder role covered that." : "They don't show everything I do. I still know the work."
@@ -1572,11 +1592,14 @@ function requiresAccountAgeEvidence(question) {
 }
 
 function applicantQuestions(v) {
+  const submittedPhoneQuestion = v.phone.applicationNumber
+    ? [{ id: "phone-number", question: "What phone number did you use?", answer: `My number is ${v.phone.spokenNumber}.`, hold: 6500, after: "phone-number" }]
+    : [];
   const base = [
     ...v.questions
       .map(([question, answer], index) => ({ id: `base-${index}`, question, answer }))
       .filter(item => state.discoveredReasons.has("account_too_new") || !requiresAccountAgeEvidence(item.question)),
-    { id: "phone-number", question: "What phone number did you use?", answer: `My number is ${v.phone.spokenNumber}.`, hold: 6500, after: "phone-number" }
+    ...submittedPhoneQuestion
   ];
   const contextual = [...state.discoveredReasons]
     .map(reason => evidenceQuestion(v, reason))
@@ -1604,8 +1627,10 @@ function cardHtml(v, animatedField = "") {
   const phone = v.phone.applicationNumber
     ? `<strong>${escapeHtml(v.phone.applicationNumber)}</strong>`
     : `<strong><em class="card-missing">Not provided</em></strong>`;
-  const phoneClass = `card-data-field phone-field${v.phone.applicationNumber ? " connectable" : ""}`;
-  const phoneAttribute = v.phone.applicationNumber ? ` data-connect-key="application-phone"` : "";
+  const phoneClass = "card-data-field phone-field connectable";
+  const phoneAttribute = v.phone.applicationNumber
+    ? ` data-connect-key="application-phone"`
+    : ` data-connect-key="missing-phone"`;
   const xValue = xVisible
     ? `<strong class="card-x-copy" data-copy-x="${escapeHtml(v.xHandle)}" role="button" tabindex="0" aria-label="Copy X username ${escapeHtml(v.xHandle)}">${escapeHtml(v.xHandle)}</strong>`
     : `<strong><em class="card-missing">Not provided</em></strong>`;
@@ -1798,6 +1823,7 @@ function selectEvidence(element) {
 function connectedRejectReason(selected, v) {
   const evidenceKey = selected.key;
   if (evidenceKey === "missing-x" && (v.xHandle === "—" || isXHidden(v))) return "missing_x";
+  if (evidenceKey === "missing-phone" && !v.phone.applicationNumber) return "missing_phone";
   if (evidenceKey === "previous-ban" && Number(v.account?.bans) > 0) return "previous_ban";
   if (evidenceKey === "account-age" && accountAgeDays(v) < state.shiftRules.minAccountAgeDays) return "account_too_new";
   if (evidenceKey === "phone-status" && state.shiftRules.phoneVerificationRequired && !v.phone.verified) return "phone_not_verified";
@@ -2380,7 +2406,7 @@ function launchIncident(v, incident) {
     sourceVisitor: v.username
   });
   incident.entryId = entry.id;
-  applyCommunityChanges({ safety: -3, trust: -1 }, "INCIDENT ACTIVE");
+  applyCommunityChanges({ safety: -20, trust: -20, activity: -10 }, "INCIDENT ACTIVE");
 
   if (state.community.supporters > 0) {
     scheduleIncidentStep(incident, 4200, () => {
@@ -2392,18 +2418,18 @@ function launchIncident(v, incident) {
   scheduleIncidentStep(incident, firstEscalation, () => {
     incident.escalations = 1;
     addCastMessage("curious", "is this legit?", { accent: "#f0d66d" });
-    applyCommunityChanges({ safety: -5, trust: -3 }, "SCAM SPREADING");
+    applyCommunityChanges({ safety: -7, trust: -7 }, "SCAM SPREADING");
   });
   scheduleIncidentStep(incident, firstEscalation + 10000, () => {
     incident.escalations = 2;
     addCastMessage("victim", "clicked it 💀 why was that still up", { accent: "#ff6f79" });
-    applyCommunityChanges({ safety: -5, trust: -4 }, "MEMBER AFFECTED");
+    applyCommunityChanges({ safety: -7, trust: -7 }, "MEMBER AFFECTED");
   });
   scheduleIncidentStep(incident, firstEscalation + 19000, () => {
     incident.escalations = 3;
     incident.failed = true;
     addMessage("general", "system", "Two members left the server after the incident.", { accent: "#ff6f79" });
-    applyCommunityChanges({ safety: -7, trust: -5, activity: -5, members: -2 }, "COMMUNITY DAMAGE");
+    applyCommunityChanges({ safety: -7, trust: -7, activity: -14, members: -2 }, "COMMUNITY DAMAGE");
   });
 }
 
