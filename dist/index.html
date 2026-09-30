@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080916'/%3E%3Cpath d='M17 14h16c12 0 19 7 19 18s-7 18-19 18H17V14Zm12 10v16h4c6 0 9-3 9-8s-3-8-9-8h-4Z' fill='%237a74e8'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="styles.css?v=49">
+  <link rel="stylesheet" href="styles.css?v=57">
 </head>
 <body>
   <div class="room-glow" aria-hidden="true"></div>
@@ -138,7 +138,7 @@
 
             <div class="tool-screen" id="databaseApp" data-tool-screen="database">
               <form class="terminal-search" id="databaseForm">
-                <label for="databaseInput">ENTER USERNAME YOURSELF</label>
+                <label for="databaseInput">USERNAME READY // PRESS SEARCH</label>
                 <div><span>@</span><input id="databaseInput" type="text" autocomplete="off" spellcheck="false" placeholder="type username" maxlength="32"><button type="submit">SEARCH</button></div>
               </form>
               <div class="search-output" id="databaseResults" aria-live="polite">
@@ -148,7 +148,7 @@
 
             <div class="tool-screen" id="xApp" data-tool-screen="x" hidden>
               <form class="terminal-search" id="xForm">
-                <label for="xInput">ENTER X HANDLE YOURSELF</label>
+                <label for="xInput">X HANDLE READY // PRESS OPEN</label>
                 <div><span>@</span><input id="xInput" type="text" autocomplete="off" spellcheck="false" placeholder="type handle" maxlength="32"><button type="submit">OPEN</button></div>
               </form>
               <div class="search-output" id="xResults" aria-live="polite">
@@ -295,6 +295,6 @@
   </section>
 
   <div class="toast" id="toast" role="status" aria-live="polite">DECISION LOGGED</div>
-  <script src="game.js?v=49"></script>
+  <script src="game.js?v=57"></script>
 </body>
 </html>

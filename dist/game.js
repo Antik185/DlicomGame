@@ -608,8 +608,10 @@ function clearMobileEvidenceMode() {
 function prepareMobileEvidenceMode(element) {
   if (!isMobileLandscapeLayout() || !state.selectedEvidence) return;
   const selected = state.selectedEvidence;
-  selected.wasToolOpen = !els.toolTray.hidden && Boolean(element.closest("#toolTray"));
-  selected.anchor = els.mobileEvidenceChip;
+  selected.wasToolOpen = Boolean(element.closest("#toolTray"));
+  selected.anchor = selected.wasToolOpen && selected.toolAnchor?.isConnected
+    ? selected.toolAnchor
+    : selected.element;
   const rawLabel = element.querySelector("span")?.textContent || selected.key || "ACCOUNT RECORD";
   els.mobileEvidenceName.textContent = rawLabel.trim().replace(/\s+/g," ").toUpperCase();
   els.mobileEvidenceHint.textContent = selected.key === "account-age" ? "TAP THE MATCHING RULE" : "TAP MASCOT TO CONNECT";
@@ -642,6 +644,18 @@ function escapeHtml(value) {
 
 function normalizeHandle(value) { return String(value || "").trim().toLowerCase().replace(/^@/, ""); }
 function current() { return visitors[state.index]; }
+function applicantDiscordUsername() {
+  return els.toolOutput.querySelector("[data-copy-username]")?.dataset.copyUsername || current().username;
+}
+function prefillInput(input, value) {
+  input.dataset.prefill = value;
+  input.defaultValue = value;
+  input.value = value;
+  if (value) input.setAttribute("value", value);
+  else input.removeAttribute("value");
+  if (input === els.databaseInput) input.placeholder = value || "type username";
+  if (input === els.xInput) input.placeholder = value || "type handle";
+}
 function scenarioKey(visitor) { return visitor.templateKey || visitor.username; }
 function isXHidden(visitor) { return hiddenXHandles.has(scenarioKey(visitor)); }
 
@@ -1139,6 +1153,9 @@ function enterTrainingStep(id) {
   state.training.stepId = id;
   if (step.closeTool) setApp("discord");
   if (step.effect) runTrainingStepEffect(step);
+  if (isMobileLandscapeLayout() && step.id === "t1_age" && els.toolTray.hidden) {
+    setApp("database", "account");
+  }
   els.trainingLayer.hidden = false;
   els.trainingLayer.classList.toggle("free-mode",Boolean(step.free || !(step.highlight || []).length));
   renderTrainingMessage(step.message);
@@ -1427,7 +1444,7 @@ function setApp(app, mode = "") {
     els.toolTitle.textContent = titles[mode] || (app === "x" ? "X PROFILE" : "SERVER SEARCH");
     if (app === "database" && !["phone", "device"].includes(mode)) {
       state.activeDatabaseMode = mode || "search";
-      els.databaseInput.value = "";
+      prefillInput(els.databaseInput, applicantDiscordUsername().replace(/^@/, ""));
       const prompts = {
         search: ["⌕", "SERVER SEARCH", "Enter a username to search members who are already on the server."],
         aliases: ["≈", "SIMILAR USERNAMES", "Enter a username to find close matches among server members."],
@@ -1440,8 +1457,20 @@ function setApp(app, mode = "") {
     els.databaseResults.classList.toggle("full-height", app === "database" && ["phone", "device"].includes(mode));
     if (app === "database" && mode === "phone") revealPhoneLookup();
     if (app === "database" && mode === "device") revealDeviceCheck();
-    if (app === "database" && !["phone", "device"].includes(mode)) setTimeout(() => els.databaseInput.focus(), 0);
-    if (app === "x") setTimeout(() => els.xInput.focus(), 0);
+    if (app === "database" && !["phone", "device"].includes(mode)) {
+      const username = applicantDiscordUsername().replace(/^@/, "");
+      setTimeout(() => {
+        els.databaseInput.focus();
+        prefillInput(els.databaseInput, username);
+      }, 0);
+    }
+    if (app === "x") {
+      const v = current();
+      const canPrefillX = v.xHandle !== "—" && (!isXHidden(v) || state.revealed.x);
+      prefillInput(els.xInput, canPrefillX ? v.xHandle.replace(/^@/, "") : "");
+      els.xResults.innerHTML = emptyTool("𝕏", "PROFILE LOOKUP", canPrefillX ? "Review the handle, then press OPEN yourself." : "Connect the missing X field to the applicant first.");
+      setTimeout(() => els.xInput.focus(), 0);
+    }
     if (state.training.active) {
       const v = current();
       if (app === "database" && mode === "account") {
@@ -1516,6 +1545,11 @@ function evidenceQuestion(v, reason) {
       question: "Why does your X activity look suspicious?",
       answer: key === "@m0gster" ? "People view the profile without liking anything. That doesn't make me fake." : "The engagement spiked after a promotion. I thought the activity was organic."
     },
+    missing_x: {
+      question: v.xHandle === "—" ? "Why didn't you add an X profile?" : "What's your X handle?",
+      answer: v.xHandle === "—" ? "I don't use X." : `It's ${v.xHandle}.`,
+      reveal: "x"
+    },
     role_unverified: {
       question: "How do your posts prove the role you requested?",
       answer: key === "@coolbuilder" ? "I build houses. I thought the Builder role covered that." : "They don't show everything I do. I still know the work."
@@ -1529,18 +1563,24 @@ function evidenceQuestion(v, reason) {
   return item ? { id: `evidence-${reason}`, ...item } : null;
 }
 
+function requiresAccountAgeEvidence(question) {
+  const text = String(question || "").toLowerCase();
+  return text.includes("why is discord new")
+    || text.includes("is this your first account")
+    || text.includes("account be from tomorrow")
+    || /why (?:is|was) (?:your )?account (?:so )?new/.test(text);
+}
+
 function applicantQuestions(v) {
   const base = [
-    ...v.questions.map(([question, answer], index) => ({ id: `base-${index}`, question, answer })),
+    ...v.questions
+      .map(([question, answer], index) => ({ id: `base-${index}`, question, answer }))
+      .filter(item => state.discoveredReasons.has("account_too_new") || !requiresAccountAgeEvidence(item.question)),
     { id: "phone-number", question: "What phone number did you use?", answer: `My number is ${v.phone.spokenNumber}.`, hold: 6500, after: "phone-number" }
   ];
   const contextual = [...state.discoveredReasons]
     .map(reason => evidenceQuestion(v, reason))
     .filter(Boolean);
-  const xListed = v.xHandle !== "—" && !isXHidden(v);
-  if (!xListed && !state.revealed.x) {
-    contextual.push({ id: "profile-x", question: "What's your X handle?", answer: v.xHandle === "—" ? "I don't use X." : `It's ${v.xHandle}.`, reveal: "x" });
-  }
   if (!v.bio && !state.revealed.bio) {
     contextual.push({ id: "profile-bio", question: "Why didn't you add a bio?", answer: v.bioReason || "I skipped it when I sent the application." });
   }
@@ -1566,7 +1606,11 @@ function cardHtml(v, animatedField = "") {
     : `<strong><em class="card-missing">Not provided</em></strong>`;
   const phoneClass = `card-data-field phone-field${v.phone.applicationNumber ? " connectable" : ""}`;
   const phoneAttribute = v.phone.applicationNumber ? ` data-connect-key="application-phone"` : "";
-  const xValue = xVisible ? escapeHtml(v.xHandle) : `<em class="card-missing">Not provided</em>`;
+  const xValue = xVisible
+    ? `<strong class="card-x-copy" data-copy-x="${escapeHtml(v.xHandle)}" role="button" tabindex="0" aria-label="Copy X username ${escapeHtml(v.xHandle)}">${escapeHtml(v.xHandle)}</strong>`
+    : `<strong><em class="card-missing">Not provided</em></strong>`;
+  const xClass = `card-data-field x-field${animatedField === "x" ? " field-reveal" : ""}${xVisible ? "" : " connectable"}`;
+  const xAttribute = xVisible ? "" : ` data-connect-key="missing-x"`;
   const bioValue = bioVisible ? escapeHtml(applicantBio(v)) : `<em class="card-missing">Not provided</em>`;
   return `<article class="applicant-sheet">
     <div class="applicant-photo"><img src="${escapeHtml(v.avatar || "assets/dlicom-builder.png")}" alt="${escapeHtml(v.name)}"></div>
@@ -1578,7 +1622,7 @@ function cardHtml(v, animatedField = "") {
     </div>
     <div class="applicant-section applicant-contact">
       <div class="${phoneClass}"${phoneAttribute}><span>Phone number</span>${phone}</div>
-      <div class="card-data-field ${animatedField === "x" ? "field-reveal" : ""}"><span>X (Twitter)</span><strong>${xValue}</strong></div>
+      <div class="${xClass}"${xAttribute}><span>X (Twitter)</span>${xValue}</div>
       <div class="card-data-field card-bio ${animatedField === "bio" ? "field-reveal" : ""}"><span>Short bio</span><strong>${bioValue}</strong></div>
     </div>
   </article>`;
@@ -1740,6 +1784,7 @@ function selectEvidence(element) {
   state.selectedEvidence = {
     key: element.dataset.evidenceKey || element.dataset.connectKey,
     element,
+    toolAnchor: document.querySelector(".verify-button.active"),
     account: element.dataset.deviceAccount || "",
     bans: Number(element.dataset.deviceBans || 0)
   };
@@ -1752,6 +1797,7 @@ function selectEvidence(element) {
 
 function connectedRejectReason(selected, v) {
   const evidenceKey = selected.key;
+  if (evidenceKey === "missing-x" && (v.xHandle === "—" || isXHidden(v))) return "missing_x";
   if (evidenceKey === "previous-ban" && Number(v.account?.bans) > 0) return "previous_ban";
   if (evidenceKey === "account-age" && accountAgeDays(v) < state.shiftRules.minAccountAgeDays) return "account_too_new";
   if (evidenceKey === "phone-status" && state.shiftRules.phoneVerificationRequired && !v.phone.verified) return "phone_not_verified";
@@ -1904,8 +1950,10 @@ function searchX(rawQuery, shouldRender = true) {
 
 function resetTabletTools() {
   els.databaseForm.hidden = false;
-  els.databaseInput.value = "";
-  els.xInput.value = "";
+  prefillInput(els.databaseInput, applicantDiscordUsername().replace(/^@/, ""));
+  const v = current();
+  const canPrefillX = v.xHandle !== "—" && (!isXHidden(v) || state.revealed.x);
+  prefillInput(els.xInput, canPrefillX ? v.xHandle.replace(/^@/, "") : "");
   els.databaseResults.innerHTML = emptyTool("⌕", "NO QUERY", "Use the name on the applicant card, or search any claimed inviter.");
   els.xResults.innerHTML = emptyTool("𝕏", "PROFILE LOOKUP", "Enter the handle shown on the applicant card.");
 }
@@ -2254,11 +2302,11 @@ function showToast(message, tone) {
   setTimeout(() => els.toast.classList.remove("show"), 1250);
 }
 
-async function copyApplicantUsername(target) {
+async function copyApplicantValue(target) {
   if (!isMobileLandscapeLayout()) return;
-  const username = target?.dataset.copyUsername;
-  if (!username) return;
-  const value = username.replace(/^@/, "");
+  const source = target?.dataset.copyUsername || target?.dataset.copyX;
+  if (!source) return;
+  const value = source.replace(/^@/, "");
   try {
     await navigator.clipboard.writeText(value);
     showToast(`@${value} COPIED`, "accept");
@@ -2787,12 +2835,12 @@ document.addEventListener("touchmove", event => {
   if (document.documentElement.classList.contains("connection-active")) event.preventDefault();
 }, { passive: false, capture: true });
 els.toolClose.addEventListener("click", () => setApp("discord"));
-els.databaseForm.addEventListener("submit", event => { event.preventDefault(); try { searchDatabase(els.databaseInput.value); beep("click"); } catch (error) { els.databaseResults.innerHTML = emptyTool("!", "ENTER A USERNAME", error.message); } });
-els.xForm.addEventListener("submit", event => { event.preventDefault(); try { searchX(els.xInput.value); beep("click"); } catch (error) { els.xResults.innerHTML = emptyTool("!", "ENTER A HANDLE", error.message); } });
+els.databaseForm.addEventListener("submit", event => { event.preventDefault(); try { const query = els.databaseInput.value.trim() || els.databaseInput.dataset.prefill || ""; prefillInput(els.databaseInput, query); searchDatabase(query); beep("click"); } catch (error) { els.databaseResults.innerHTML = emptyTool("!", "ENTER A USERNAME", error.message); } });
+els.xForm.addEventListener("submit", event => { event.preventDefault(); try { const query = els.xInput.value.trim() || els.xInput.dataset.prefill || ""; prefillInput(els.xInput, query); searchX(query); beep("click"); } catch (error) { els.xResults.innerHTML = emptyTool("!", "ENTER A HANDLE", error.message); } });
 els.toolOutput.addEventListener("click", event => {
-  const copyUsername = event.target.closest("[data-copy-username]");
-  if (copyUsername) {
-    copyApplicantUsername(copyUsername);
+  const copyTarget = event.target.closest("[data-copy-username],[data-copy-x]");
+  if (copyTarget) {
+    copyApplicantValue(copyTarget);
     return;
   }
   const field = event.target.closest("[data-connect-key]");
@@ -2802,10 +2850,10 @@ els.toolOutput.addEventListener("click", event => {
   else resolveEvidenceConnection(field, field.dataset.connectKey);
 });
 els.toolOutput.addEventListener("keydown", event => {
-  const copyUsername = event.target.closest("[data-copy-username]");
-  if (!copyUsername || !["Enter", " "].includes(event.key)) return;
+  const copyTarget = event.target.closest("[data-copy-username],[data-copy-x]");
+  if (!copyTarget || !["Enter", " "].includes(event.key)) return;
   event.preventDefault();
-  copyApplicantUsername(copyUsername);
+  copyApplicantValue(copyTarget);
 });
 els.databaseResults.addEventListener("click", event => {
   const currentDeviceAccount = event.target.closest("[data-device-current]");
@@ -2872,7 +2920,12 @@ els.xResults.addEventListener("click", event => {
 });
 els.shiftRulesList.addEventListener("click", event => {
   const target = event.target.closest("[data-connect-target]");
-  if (!target || !state.selectedEvidence) return;
+  if (!target) return;
+  if (!state.selectedEvidence && state.training.active && currentTrainingStep()?.id === "t1_connect_rule") {
+    const ageField = els.databaseResults.querySelector("[data-connect-key='account-age']");
+    if (ageField) selectEvidence(ageField);
+  }
+  if (!state.selectedEvidence) return;
   resolveEvidenceConnection(target,target.dataset.connectTarget);
 });
 els.channelFeed.addEventListener("click", event => {
