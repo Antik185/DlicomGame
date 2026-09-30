@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080916'/%3E%3Cpath d='M17 14h16c12 0 19 7 19 18s-7 18-19 18H17V14Zm12 10v16h4c6 0 9-3 9-8s-3-8-9-8h-4Z' fill='%237a74e8'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="styles.css?v=59">
+  <link rel="stylesheet" href="styles.css?v=60">
 </head>
 <body>
   <div class="room-glow" aria-hidden="true"></div>
@@ -215,17 +215,20 @@
         <div class="language-selector-head">
           <span>LANGUAGE</span><strong id="languageTitle">Choose interface language</strong>
         </div>
-        <div class="language-picker" id="languagePicker" role="group" aria-label="Interface language">
-          <button class="language-choice" type="button" data-language="en"><strong>English</strong><span>EN</span></button>
-          <button class="language-choice" type="button" data-language="ru"><strong>Русский</strong><span>RU</span></button>
-          <button class="language-choice" type="button" data-language="uk"><strong>Українська</strong><span>UK</span></button>
-          <button class="language-choice" type="button" data-language="hi"><strong>हिन्दी</strong><span>HI</span></button>
-          <button class="language-choice" type="button" data-language="bn"><strong>বাংলা</strong><span>BN</span></button>
-          <button class="language-choice" type="button" data-language="ar"><strong>العربية</strong><span>AR</span></button>
-          <button class="language-choice" type="button" data-language="id"><strong>Indonesia</strong><span>ID</span></button>
-          <button class="language-choice" type="button" data-language="zh"><strong>中文</strong><span>ZH</span></button>
-          <button class="language-choice" type="button" data-language="vi"><strong>Tiếng Việt</strong><span>VI</span></button>
-        </div>
+        <label class="language-dropdown">
+          <select id="languageSelect" aria-label="Interface language">
+            <option value="en">English</option>
+            <option value="ru">Русский</option>
+            <option value="uk">Українська</option>
+            <option value="hi">हिन्दी</option>
+            <option value="bn">বাংলা</option>
+            <option value="ar">العربية</option>
+            <option value="id">Bahasa Indonesia</option>
+            <option value="zh">中文</option>
+            <option value="vi">Tiếng Việt</option>
+          </select>
+          <span aria-hidden="true">⌄</span>
+        </label>
       </section>
       <section class="pool-selector" aria-labelledby="poolTitle">
         <div class="pool-selector-head">
@@ -311,7 +314,7 @@
   </section>
 
   <div class="toast" id="toast" role="status" aria-live="polite">DECISION LOGGED</div>
-  <script src="localization.js?v=59"></script>
-  <script src="game.js?v=59"></script>
+  <script src="localization.js?v=60"></script>
+  <script src="game.js?v=60"></script>
 </body>
 </html>

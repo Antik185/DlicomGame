@@ -554,7 +554,7 @@ const els = {
   safety: $("safetyValue"), trust: $("trustValue"), activity: $("activityValue"),
   builders: $("buildersCount"), artists: $("artistsCount"), clipmakers: $("clipmakersCount"), supporters: $("supportersCount"), members: $("membersCount"),
   regionPicker: $("regionPicker"), poolStatus: $("poolStatus"), startButton: $("startButton"),
-  languagePicker: $("languagePicker"),
+  languageSelect: $("languageSelect"),
   rejectOverlay: $("rejectOverlay"), rejectReasons: $("rejectReasons"), rejectClose: $("rejectClose"),
   soundButton: $("soundButton"), soundLabel: $("soundLabel"), chatSoundButton: $("chatSoundButton"), chatSoundLabel: $("chatSoundLabel"),
   volumeSlider: $("volumeSlider"), volumeValue: $("volumeValue"), shiftRulesList: $("shiftRulesList"), rulesMemo: $("rulesMemo"),
@@ -3029,10 +3029,12 @@ els.regionPicker?.addEventListener("click", event => {
   updatePoolStatus();
   beep("click");
 });
-els.languagePicker?.addEventListener("click", event => {
-  const button = event.target.closest("[data-language]");
-  if (!button || state.started) return;
-  window.DLICOM_I18N?.setLocale(button.dataset.language);
+els.languageSelect?.addEventListener("change", event => {
+  if (state.started) {
+    event.target.value = localeCode();
+    return;
+  }
+  window.DLICOM_I18N?.setLocale(event.target.value);
   beep("click");
 });
 document.addEventListener("dlicom:languagechange", () => {
