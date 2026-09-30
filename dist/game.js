@@ -579,6 +579,22 @@ function isMobileLandscapeLayout() {
   return window.matchMedia("(max-width: 999px) and (orientation: landscape)").matches;
 }
 
+function requestMobileGameFullscreen() {
+  if (!window.matchMedia("(max-width: 999px) and (pointer: coarse)").matches) return;
+  if (document.fullscreenElement || document.webkitFullscreenElement) return;
+  const root = document.documentElement;
+  const standardRequest = root.requestFullscreen;
+  const webkitRequest = root.webkitRequestFullscreen;
+  try {
+    const request = standardRequest
+      ? standardRequest.call(root, { navigationUI:"hide" })
+      : webkitRequest?.call(root);
+    request?.catch?.(() => {});
+  } catch (_) {
+    // Some mobile browsers do not expose document fullscreen; the normal layout remains usable.
+  }
+}
+
 function closeMobilePanels(playSound = false) {
   Object.values(mobilePanels).forEach(({ className, button }) => {
     document.body.classList.remove(className);
@@ -3048,8 +3064,14 @@ document.addEventListener("dlicom:languagechange", () => {
   els.chatSoundLabel.textContent = state.chatSound ? tr("chatOn") : tr("chatMuted");
   if (state.training.active) renderTrainingMessage(currentTrainingStep()?.message || []);
 });
-els.startButton.addEventListener("click", startShift);
-els.trainingButton.addEventListener("click", startTraining);
+els.startButton.addEventListener("click", () => {
+  requestMobileGameFullscreen();
+  startShift();
+});
+els.trainingButton.addEventListener("click", () => {
+  requestMobileGameFullscreen();
+  startTraining();
+});
 els.trainingNext.addEventListener("click", advanceTrainingStep);
 els.trainingSkip.addEventListener("click", () => { els.trainingSkipConfirm.hidden = false; beep("click"); });
 els.trainingSkipCancel.addEventListener("click", () => { els.trainingSkipConfirm.hidden = true; beep("click"); });
